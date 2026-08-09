@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAdminFromInitData } from "../lib/telegramAuth";
+import { requireAdminFromInitData, checkAdminPassword } from "../lib/telegramAuth";
 import { supabase, setSetting } from "../lib/supabase";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -14,9 +14,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(401).json({ error: "Bu bölmə yalnız admin üçündür." });
     return;
   }
+  if (!checkAdminPassword(req.headers["x-admin-password"])) {
+    res.status(401).json({ error: "Şifrə səhvdir." });
+    return;
+  }
 
   const b = req.body || {};
   const action = b.action;
+
+  if (action === "create_genre") {
+    if (!b.name_az || !String(b.name_az).trim()) {
+      res.status(400).json({ error: "Janr adı lazımdır." });
+      return;
+    }
+    const { data, error } = await supabase
+      .from("genres")
+      .insert({ name_az: String(b.name_az).trim() })
+      .select()
+      .single();
+    if (error) {
+      res.status(500).json({ error: error.message.includes("duplicate") ? "Bu janr artıq mövcuddur." : error.message });
+      return;
+    }
+    res.status(200).json({ genre: data });
+    return;
+  }
 
   if (action === "create_plan") {
     if (!b.title || !String(b.title).trim() || b.price === undefined || b.price === "") {

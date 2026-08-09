@@ -107,6 +107,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (telegramUserId) {
       await supabase.from("users").upsert({ id: telegramUserId });
+
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("email, phone")
+        .eq("id", telegramUserId)
+        .maybeSingle();
+
+      if (!existingUser?.email) {
+        if (!body.email) {
+          res.status(200).json({ needsContact: true });
+          return;
+        }
+        await supabase
+          .from("users")
+          .update({ email: body.email, phone: body.phone || existingUser?.phone || null })
+          .eq("id", telegramUserId);
+      }
     }
 
     const { data: sub, error } = await supabase

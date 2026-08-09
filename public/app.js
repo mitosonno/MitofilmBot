@@ -19,14 +19,6 @@ if (tgUid) {
   const link = document.getElementById("historyLink");
   link.href = `/history.html?tg=${tgUid}`;
   link.style.display = "inline-block";
-
-  if (tg && tg.initData) {
-    fetch("/api/admin-state", { headers: { "X-Telegram-Init-Data": tg.initData } })
-      .then((r) => {
-        if (r.ok) document.getElementById("adminLink").style.display = "inline-block";
-      })
-      .catch(() => {});
-  }
 }
 
 async function loadData() {
@@ -149,7 +141,7 @@ document.getElementById("changeGenre").addEventListener("click", (e) => {
   document.getElementById("genresRoot").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
-async function handleOrder(planId) {
+async function handleOrder(planId, extra) {
   const msgEl = document.getElementById("orderMsg");
   msgEl.textContent = "";
 
@@ -162,9 +154,20 @@ async function handleOrder(planId) {
     const res = await fetch("/api/public-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId, telegramUserId: getTelegramUserId(), promoCode: promoCode || undefined }),
+      body: JSON.stringify({
+        planId,
+        telegramUserId: getTelegramUserId(),
+        promoCode: promoCode || undefined,
+        ...(extra || {}),
+      }),
     });
     const data = await res.json();
+
+    if (data.needsContact) {
+      buttons.forEach((b) => (b.disabled = false));
+      openContactModal(planId);
+      return;
+    }
 
     if (!res.ok || data.error) {
       msgEl.textContent = data.error || "Sifariş yaradıla bilmədi.";
@@ -182,6 +185,36 @@ async function handleOrder(planId) {
     msgEl.textContent = "Nəsə səhv getdi, bir az sonra yenidən cəhd et 🙏";
     buttons.forEach((b) => (b.disabled = false));
   }
+}
+
+function openContactModal(planId) {
+  document.getElementById("modalSheet").innerHTML = `
+    <button class="modal-close" id="modalCloseBtn">✕</button>
+    <div class="modal-body">
+      <h3 style="margin-top:0">Bir addım qalıb</h3>
+      <p style="color:var(--muted);font-size:14px;">Ödəniş qəbzin və tövsiyələrin email-ə düşsün deyə, əlaqə məlumatını yaz:</p>
+      <div class="field"><label>Email</label><input id="contact_email" type="email" placeholder="sen@example.com" /></div>
+      <div class="field"><label>Telefon (istəyə bağlı)</label><input id="contact_phone" placeholder="+994..." /></div>
+      <button id="contactSubmitBtn" class="btn btn-gold" style="width:100%">Davam et</button>
+      <div class="msg-box" id="contactMsg"></div>
+    </div>`;
+
+  document.getElementById("modalOverlay").classList.add("open");
+  document.getElementById("modalCloseBtn").addEventListener("click", () => {
+    document.getElementById("modalOverlay").classList.remove("open");
+  });
+
+  document.getElementById("contactSubmitBtn").addEventListener("click", async () => {
+    const email = document.getElementById("contact_email").value.trim();
+    const phone = document.getElementById("contact_phone").value.trim();
+    const msg = document.getElementById("contactMsg");
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      msg.textContent = "Düzgün email yaz.";
+      return;
+    }
+    document.getElementById("modalOverlay").classList.remove("open");
+    await handleOrder(planId, { email, phone });
+  });
 }
 
 function escapeHtml(s) {

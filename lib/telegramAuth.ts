@@ -52,3 +52,13 @@ export function requireAdminFromInitData(
 
   return adminIds.includes(user.id) ? user.id : null;
 }
+
+// İkinci qorunma qatı: admin panelinə giriş üçün ayrıca şifrə.
+// ADMIN_PASSWORD təyin olunmayıbsa, bu yoxlama keçilir (geriyə uyğunluq üçün) —
+// amma ciddi istifadə üçün mütləq təyin olunmalıdır.
+export function checkAdminPassword(password: string | string[] | undefined): boolean {
+  const expected = process.env.ADMIN_PASSWORD;
+  if (!expected) return true;
+  if (!password || Array.isArray(password)) return false;
+  return password === expected;
+}

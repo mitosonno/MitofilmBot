@@ -194,7 +194,12 @@ Sayt və admin panel **Plan** əsasında işləyir:
 
 Sayt eyni Vercel layihəsində, `/` ünvanında avtomatik görünür (əlavə deploy addımı lazım deyil). Telegram Mini App daxilində açılanda (bot düyməsi ilə) istifadəçi avtomatik tanınır, sifariş onun Telegram hesabına bağlanır, və `/history.html` səhifəsindən keçmiş tövsiyələrinə baxa bilir.
 
-**Admin panel (`/admin.html`):** tam funksional idarəetmə paneli — plan yaratmaq, filmlərini idarə etmək (poster yükləmə daxil, gün/saat), yayımlamaq, silmək. Yalnız Telegram-ın rəsmi `initData` doğrulaması ilə təsdiqlənən admin id-lər daxil ola bilir (bax: `lib/telegramAuth.ts`).
+**Admin panel (`/admin.html`):** tam funksional idarəetmə paneli — janr seç → o janrın planlarını yarat/idarə et,
+filmlərini idarə et (poster yükləmə daxil, gün/saat), yayımlamaq, silmək. Yeni janr da əlavə edə bilərsən —
+avtomatik həm saytda, həm Telegram botunda görünür. Giriş İKİ QATDA qorunur: Telegram-ın rəsmi
+`initData` doğrulaması (yalnız `ADMIN_TELEGRAM_IDS`-dəki hesablar) + `ADMIN_PASSWORD` şifrəsi
+(bax: `lib/telegramAuth.ts`). Adi istifadəçilər saytda admin panelə heç bir link/işarə görmür —
+ora yalnız botun `/admin` əmri ilə keçilir.
 
 ## Növbəti addımlar (istəyə görə genişlənə bilər)
 

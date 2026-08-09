@@ -4,6 +4,7 @@ if (tg) {
   tg.expand();
 }
 const INIT_DATA = tg ? tg.initData : "";
+let ADMIN_PASSWORD = sessionStorage.getItem("mito_admin_pw") || "";
 
 const DAYS = [
   "Bazar ertəsi",
@@ -15,11 +16,11 @@ const DAYS = [
   "Bazar",
 ];
 
-let STATE = null; // { genres, plans, botPrices }
-let currentPlan = null; // hazırda idarə olunan plan (film siyahısı ekranı üçün)
+let STATE = null; // { genres, plans, botPrices, personaStyle, promoCodes }
+let currentGenre = undefined; // null = qarışıq, rəqəm = janr id
+let currentPlan = null;
 let currentPlanMovies = [];
 let selectedDay = null;
-let uploadedPosterUrl = "";
 
 function escapeHtml(s) {
   const div = document.createElement("div");
@@ -36,6 +37,7 @@ async function api(path, opts = {}) {
     headers: {
       "Content-Type": "application/json",
       "X-Telegram-Init-Data": INIT_DATA,
+      "X-Admin-Password": ADMIN_PASSWORD,
       ...(opts.headers || {}),
     },
   });
@@ -66,36 +68,71 @@ function confirmDialog(text) {
   });
 }
 
+// ============== GİRİŞ: Telegram + şifrə ==============
+
 async function init() {
   const gate = document.getElementById("gate");
   if (!INIT_DATA) {
     gate.textContent = "Bu səhifə yalnız Telegram daxilində açılır.";
     return;
   }
-  try {
-    STATE = await api("/api/admin-state");
-  } catch (e) {
-    gate.textContent = "Bu bölmə yalnız admin üçündür.";
+  if (!ADMIN_PASSWORD) {
+    showPasswordPrompt();
     return;
   }
-  gate.style.display = "none";
-  document.getElementById("adminRoot").style.display = "block";
-  renderHome();
+  await tryLoadState();
 }
 
-// ============== ANA EKRAN: planların siyahısı + yeni plan formu ==============
+function showPasswordPrompt() {
+  const gate = document.getElementById("gate");
+  gate.innerHTML = `
+    <div style="max-width:280px;margin:0 auto;">
+      <p style="margin-bottom:14px;">Admin panelinə keçmək üçün şifrəni yaz:</p>
+      <div class="field"><input type="password" id="adminPwInput" placeholder="Şifrə" /></div>
+      <button id="pwSubmitBtn" class="btn btn-gold" style="width:100%">Daxil ol</button>
+      <div class="msg-box" id="pwMsg"></div>
+    </div>`;
+  document.getElementById("pwSubmitBtn").addEventListener("click", async () => {
+    ADMIN_PASSWORD = document.getElementById("adminPwInput").value;
+    await tryLoadState();
+  });
+}
+
+async function tryLoadState() {
+  const gate = document.getElementById("gate");
+  gate.style.display = "block";
+  document.getElementById("adminRoot").style.display = "none";
+  try {
+    STATE = await api("/api/admin-state");
+    sessionStorage.setItem("mito_admin_pw", ADMIN_PASSWORD);
+    gate.style.display = "none";
+    document.getElementById("adminRoot").style.display = "block";
+    renderHome();
+  } catch (e) {
+    ADMIN_PASSWORD = "";
+    sessionStorage.removeItem("mito_admin_pw");
+    showPasswordPrompt();
+    const msg = document.getElementById("pwMsg");
+    if (msg) msg.textContent = e.message;
+  }
+}
+
+// ============== ANA EKRAN: janrlar siyahısı ==============
 
 function renderHome() {
+  currentGenre = undefined;
   currentPlan = null;
   const root = document.getElementById("adminRoot");
   root.innerHTML = `
     <div class="admin-card">
-      <h2>Yeni tövsiyə planı yarat</h2>
-      ${newPlanFormHtml()}
+      <h2>Janrlar</h2>
+      ${genresListHtml()}
     </div>
     <div class="admin-card">
-      <h2>Planların (${STATE.plans.length})</h2>
-      ${plansListHtml()}
+      <h2>Yeni janr əlavə et</h2>
+      <div class="field"><input id="new_genre_name" placeholder="məs: Fantaziya" /></div>
+      <button id="createGenreBtn" class="btn btn-gold">+ Janr əlavə et</button>
+      <div class="msg-box" id="newGenreMsg"></div>
     </div>
     <div class="admin-card">
       <h2>Bot qiymətləri (Telegram-ın köhnə mətn menyusu)</h2>
@@ -104,9 +141,8 @@ function renderHome() {
     <div class="admin-card">
       <h2>MitoFilm-in səsi</h2>
       <p style="color:var(--muted);font-size:13px;margin-top:-8px;">
-        Bura yazdıqların AI-nin salamlaşma və söhbət tərzinə əlavə olunur — nə qədər çox nümunə/qeyd
-        yazsan, bir o qədər sənin istədiyin kimi səslənər. Bu, həqiqi "özbaşına öyrənmə" deyil —
-        sən özün tənzimləyirsən, istənilən vaxt dəyişə bilərsən.
+        Bura yazdıqların AI-nin söhbət tərzinə əlavə olunur — nə qədər çox nümunə/qeyd yazsan,
+        bir o qədər sənin istədiyin kimi səslənər. İstənilən vaxt dəyişə bilərsən.
       </p>
       ${personaFormHtml()}
     </div>
@@ -119,49 +155,26 @@ function renderHome() {
   wireHomeEvents();
 }
 
-function newPlanFormHtml() {
-  const genreOptions = STATE.genres.map((g) => `<option value="${g.id}">${escapeHtml(g.name_az)}</option>`).join("");
-  return `
-    <div class="field">
-      <label>Janr</label>
-      <select id="np_genre">
-        <option value="">Qarışıq (bütün janrlar)</option>
-        ${genreOptions}
-      </select>
-    </div>
-    <div class="field">
-      <label>Planın adı</label>
-      <input id="np_title" placeholder="məs: 1 günlük / 7 günlük / 1 aylıq / İstənilən ad" />
-    </div>
-    <div class="field">
-      <label>Qiymət (AZN)</label>
-      <input id="np_price" type="number" step="0.01" placeholder="məs: 3.00" />
-    </div>
-    <button id="createPlanBtn" class="btn btn-gold">+ Plan yarat</button>
-    <div class="msg-box" id="newPlanMsg"></div>`;
-}
-
-function plansListHtml() {
-  if (STATE.plans.length === 0) {
-    return `<p style="color:var(--muted);font-size:14px;">Hələ heç bir plan yoxdur. Yuxarıdan birini yarat.</p>`;
-  }
-  return STATE.plans
-    .map(
-      (p) => `
-    <div class="admin-movie-row">
-      <div class="info">
-        <div>
-          <div class="name">${escapeHtml(p.title)} <span style="color:var(--muted);font-weight:500;">— ${escapeHtml(p.genreName)}</span></div>
-          <div class="sub">${p.price} ${escapeHtml(p.currency)} · ${p.movieCount} film · ${p.status === "published" ? "✅ yayımlanıb" : "🕓 qaralama"}</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="icon-btn open-plan" data-id="${p.id}">İdarə et</button>
-        <button class="icon-btn del-plan" data-id="${p.id}">Sil</button>
-      </div>
-    </div>`
-    )
+function genresListHtml() {
+  const rows = STATE.genres
+    .map((g) => {
+      const count = STATE.plans.filter((p) => p.genre_id === g.id).length;
+      return `
+      <div class="admin-movie-row genre-row" data-genre-id="${g.id}">
+        <div class="info"><div><div class="name">${escapeHtml(g.name_az)}</div><div class="sub">${count} plan</div></div></div>
+        <div style="color:var(--muted)">→</div>
+      </div>`;
+    })
     .join("");
+
+  const mixedCount = STATE.plans.filter((p) => p.genre_id === null).length;
+  const mixedRow = `
+    <div class="admin-movie-row genre-row" data-genre-id="">
+      <div class="info"><div><div class="name">Qarışıq</div><div class="sub">${mixedCount} plan</div></div></div>
+      <div style="color:var(--muted)">→</div>
+    </div>`;
+
+  return rows + mixedRow;
 }
 
 function botPricesFormHtml() {
@@ -178,7 +191,7 @@ function botPricesFormHtml() {
 function personaFormHtml() {
   return `
     <div class="field">
-      <textarea id="personaStyle" rows="5" placeholder="məs: Həmişə emoji istifadə et. Qısa cümlələr yaz. İstifadəçiyə 'sən' deyə müraciət et...">${escapeHtml(STATE.personaStyle)}</textarea>
+      <textarea id="personaStyle" rows="5" placeholder="məs: Həmişə emoji istifadə et. Qısa cümlələr yaz...">${escapeHtml(STATE.personaStyle)}</textarea>
     </div>
     <button id="savePersonaBtn" class="btn btn-gold">Yadda saxla</button>
     <div class="msg-box" id="personaMsg"></div>`;
@@ -222,17 +235,16 @@ function promoListHtml() {
 }
 
 function wireHomeEvents() {
-  document.getElementById("createPlanBtn").addEventListener("click", createPlan);
+  document.querySelectorAll(".genre-row").forEach((row) => {
+    row.addEventListener("click", () => {
+      const val = row.getAttribute("data-genre-id");
+      openGenre(val === "" ? null : Number(val));
+    });
+  });
+  document.getElementById("createGenreBtn").addEventListener("click", createGenre);
   document.getElementById("saveBotPricesBtn").addEventListener("click", saveBotPrices);
   document.getElementById("savePersonaBtn").addEventListener("click", savePersona);
   document.getElementById("createPromoBtn").addEventListener("click", createPromo);
-
-  document.querySelectorAll(".open-plan").forEach((b) =>
-    b.addEventListener("click", () => openPlan(b.getAttribute("data-id")))
-  );
-  document.querySelectorAll(".del-plan").forEach((b) =>
-    b.addEventListener("click", () => deletePlan(b.getAttribute("data-id")))
-  );
   document.querySelectorAll(".toggle-promo").forEach((b) =>
     b.addEventListener("click", () => togglePromo(b.getAttribute("data-id")))
   );
@@ -241,41 +253,20 @@ function wireHomeEvents() {
   );
 }
 
-async function createPlan() {
-  const msg = document.getElementById("newPlanMsg");
-  const genreVal = document.getElementById("np_genre").value;
-  const title = document.getElementById("np_title").value.trim();
-  const price = document.getElementById("np_price").value;
-
-  if (!title || !price) {
-    msg.textContent = "Ad və qiyməti doldur.";
+async function createGenre() {
+  const msg = document.getElementById("newGenreMsg");
+  const name = document.getElementById("new_genre_name").value.trim();
+  if (!name) {
+    msg.textContent = "Ad yaz.";
     return;
   }
-
   try {
-    const data = await api("/api/admin-actions", {
-      method: "POST",
-      body: JSON.stringify({ action: "create_plan", genre_id: genreVal, title, price }),
-    });
+    await api("/api/admin-actions", { method: "POST", body: JSON.stringify({ action: "create_genre", name_az: name }) });
     STATE = await api("/api/admin-state");
     renderHome();
-    showToast("Plan yaradıldı ✅");
-    openPlan(data.plan.id);
+    showToast("Janr əlavə olundu ✅");
   } catch (e) {
     msg.textContent = e.message;
-  }
-}
-
-async function deletePlan(id) {
-  const ok = await confirmDialog("Bu planı və içindəki bütün filmləri silmək istəyirsən?");
-  if (!ok) return;
-  try {
-    await api("/api/admin-actions", { method: "POST", body: JSON.stringify({ action: "delete_plan", plan_id: id }) });
-    STATE = await api("/api/admin-state");
-    renderHome();
-    showToast("Plan silindi");
-  } catch (e) {
-    showToast(e.message);
   }
 }
 
@@ -364,11 +355,113 @@ async function deletePromo(id) {
   }
 }
 
+// ============== JANR EKRANI: o janrın planları ==============
+
+function openGenre(genreId) {
+  currentGenre = genreId;
+  renderGenreScreen();
+}
+
+function renderGenreScreen() {
+  const root = document.getElementById("adminRoot");
+  const genreName =
+    currentGenre === null ? "Qarışıq" : (STATE.genres.find((g) => g.id === currentGenre) || {}).name_az || "";
+  const plans = STATE.plans.filter((p) => p.genre_id === currentGenre);
+
+  const rows = plans
+    .map(
+      (p) => `
+    <div class="admin-movie-row">
+      <div class="info">
+        <div>
+          <div class="name">${escapeHtml(p.title)}</div>
+          <div class="sub">${p.price} ${escapeHtml(p.currency)} · ${p.movieCount} film · ${p.status === "published" ? "✅ yayımlanıb" : "🕓 qaralama"}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="icon-btn open-plan" data-id="${p.id}">İdarə et</button>
+        <button class="icon-btn del-plan" data-id="${p.id}">Sil</button>
+      </div>
+    </div>`
+    )
+    .join("");
+
+  root.innerHTML = `
+    <button class="icon-btn" id="backHomeBtn" style="margin-bottom:16px;">← Bütün janrlar</button>
+    <div class="admin-card">
+      <h2>${escapeHtml(genreName)}</h2>
+      <div class="field"><label>Yeni plan adı</label><input id="np_title" placeholder="məs: 1 film / 7 film / 30 film / İstənilən ad" /></div>
+      <div class="field"><label>Qiymət (AZN)</label><input id="np_price" type="number" step="0.01" placeholder="məs: 3.00" /></div>
+      <button id="createPlanBtn" class="btn btn-gold">+ Plan yarat</button>
+      <div class="msg-box" id="newPlanMsg"></div>
+    </div>
+    <div class="admin-card">
+      <h2>Planlar (${plans.length})</h2>
+      ${rows || '<p style="color:var(--muted);font-size:14px;">Hələ plan yoxdur.</p>'}
+    </div>
+  `;
+
+  document.getElementById("backHomeBtn").addEventListener("click", renderHome);
+  document.getElementById("createPlanBtn").addEventListener("click", createPlanInGenre);
+  document.querySelectorAll(".open-plan").forEach((b) =>
+    b.addEventListener("click", () => openPlan(b.getAttribute("data-id")))
+  );
+  document.querySelectorAll(".del-plan").forEach((b) =>
+    b.addEventListener("click", () => deletePlan(b.getAttribute("data-id")))
+  );
+}
+
+async function createPlanInGenre() {
+  const msg = document.getElementById("newPlanMsg");
+  const title = document.getElementById("np_title").value.trim();
+  const price = document.getElementById("np_price").value;
+
+  if (!title || !price) {
+    msg.textContent = "Ad və qiyməti doldur.";
+    return;
+  }
+
+  const btn = document.getElementById("createPlanBtn");
+  btn.disabled = true;
+
+  try {
+    const data = await api("/api/admin-actions", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "create_plan",
+        genre_id: currentGenre === null ? "" : currentGenre,
+        title,
+        price,
+      }),
+    });
+    STATE = await api("/api/admin-state");
+    showToast("Plan yaradıldı ✅");
+    openPlan(data.plan.id);
+  } catch (e) {
+    msg.textContent = e.message;
+    btn.disabled = false;
+  }
+}
+
+async function deletePlan(id) {
+  const ok = await confirmDialog("Bu planı və içindəki bütün filmləri silmək istəyirsən?");
+  if (!ok) return;
+  try {
+    await api("/api/admin-actions", { method: "POST", body: JSON.stringify({ action: "delete_plan", plan_id: id }) });
+    STATE = await api("/api/admin-state");
+    renderGenreScreen();
+    showToast("Plan silindi");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
 // ============== PLAN EKRANI: planın filmləri ==============
 
 async function openPlan(planId) {
   currentPlan = STATE.plans.find((p) => p.id === planId);
   if (!currentPlan) return;
+  currentGenre = currentPlan.genre_id;
 
   const root = document.getElementById("adminRoot");
   root.innerHTML = `<div class="admin-card"><p style="color:var(--muted)">Yüklənir...</p></div>`;
@@ -405,9 +498,9 @@ function renderPlanScreen() {
     .join("");
 
   root.innerHTML = `
-    <button class="icon-btn" id="backHomeBtn" style="margin-bottom:16px;">← Bütün planlar</button>
+    <button class="icon-btn" id="backGenreBtn" style="margin-bottom:16px;">← Geri</button>
     <div class="admin-card">
-      <h2>${escapeHtml(currentPlan.title)} — ${escapeHtml(currentPlan.genreName)}</h2>
+      <h2>${escapeHtml(currentPlan.title)}</h2>
       <p style="color:var(--muted);font-size:14px;margin-top:-8px;">${currentPlan.price} ${escapeHtml(currentPlan.currency)} · ${currentPlan.status === "published" ? "✅ yayımlanıb" : "🕓 qaralama"}</p>
       <div class="form-actions">
         ${
@@ -427,9 +520,9 @@ function renderPlanScreen() {
     </div>
   `;
 
-  document.getElementById("backHomeBtn").addEventListener("click", async () => {
+  document.getElementById("backGenreBtn").addEventListener("click", async () => {
     STATE = await api("/api/admin-state");
-    renderHome();
+    renderGenreScreen();
   });
 
   const pubBtn = document.getElementById("publishBtn");
@@ -517,7 +610,6 @@ async function handlePosterFile(file) {
       method: "POST",
       body: JSON.stringify({ imageBase64: base64, filename: file.name, contentType: "image/jpeg" }),
     });
-    uploadedPosterUrl = data.url;
     document.getElementById("f_poster").value = data.url;
     preview.innerHTML += ` <span style="color:#8fd19e;font-size:12px;">✅ Yükləndi</span>`;
   } catch (e) {
@@ -527,7 +619,6 @@ async function handlePosterFile(file) {
 
 function openMovieModal(movie) {
   selectedDay = movie ? movie.recommended_day : null;
-  uploadedPosterUrl = movie ? movie.poster_url : "";
 
   const dayPills = DAYS.map(
     (d) => `<button type="button" class="day-pill ${d === selectedDay ? "selected" : ""}" data-day="${escapeAttr(d)}">${escapeHtml(d)}</button>`
@@ -582,14 +673,19 @@ function openMovieModal(movie) {
     });
   });
 
-  document.getElementById("saveMovieBtn").addEventListener("click", () => saveMovie(movie ? movie.id : null));
+  // Vacib: düymə YALNIZ BİR DƏFƏ işə düşsün deyə, kliklənən kimi dərhal deaktiv edirik —
+  // əks halda tələsik ikinci klik eyni filmi TƏKRAR əlavə edə bilər.
+  const saveBtn = document.getElementById("saveMovieBtn");
+  saveBtn.addEventListener("click", () => saveMovie(movie ? movie.id : null, saveBtn));
 }
 
 function closeModal() {
   document.getElementById("modalOverlay").classList.remove("open");
 }
 
-async function saveMovie(id) {
+async function saveMovie(id, btn) {
+  if (btn.disabled) return;
+
   const msg = document.getElementById("movieMsg");
   const payload = {
     plan_id: currentPlan.id,
@@ -615,6 +711,8 @@ async function saveMovie(id) {
     return;
   }
 
+  btn.disabled = true;
+
   try {
     if (id) {
       const data = await api(`/api/admin-movie?id=${encodeURIComponent(id)}`, {
@@ -632,6 +730,7 @@ async function saveMovie(id) {
     showToast(id ? "Yeniləndi ✅" : "Əlavə olundu ✅");
   } catch (e) {
     msg.textContent = e.message;
+    btn.disabled = false;
   }
 }
 

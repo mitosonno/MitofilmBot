@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAdminFromInitData } from "../lib/telegramAuth";
+import { requireAdminFromInitData, checkAdminPassword } from "../lib/telegramAuth";
 import { supabase } from "../lib/supabase";
 
 function movieFields(b: any) {
@@ -27,6 +27,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const adminId = requireAdminFromInitData(initData);
   if (!adminId) {
     res.status(401).json({ error: "Bu bölmə yalnız admin üçündür." });
+    return;
+  }
+  if (!checkAdminPassword(req.headers["x-admin-password"])) {
+    res.status(401).json({ error: "Şifrə səhvdir." });
     return;
   }
 
