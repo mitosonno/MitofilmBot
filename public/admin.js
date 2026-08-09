@@ -101,6 +101,20 @@ function renderHome() {
       <h2>Bot qiymətləri (Telegram-ın köhnə mətn menyusu)</h2>
       ${botPricesFormHtml()}
     </div>
+    <div class="admin-card">
+      <h2>MitoFilm-in səsi</h2>
+      <p style="color:var(--muted);font-size:13px;margin-top:-8px;">
+        Bura yazdıqların AI-nin salamlaşma və söhbət tərzinə əlavə olunur — nə qədər çox nümunə/qeyd
+        yazsan, bir o qədər sənin istədiyin kimi səslənər. Bu, həqiqi "özbaşına öyrənmə" deyil —
+        sən özün tənzimləyirsən, istənilən vaxt dəyişə bilərsən.
+      </p>
+      ${personaFormHtml()}
+    </div>
+    <div class="admin-card">
+      <h2>Promo kodlar</h2>
+      ${promoFormHtml()}
+      ${promoListHtml()}
+    </div>
   `;
   wireHomeEvents();
 }
@@ -161,15 +175,69 @@ function botPricesFormHtml() {
     <div class="msg-box" id="botPricesMsg"></div>`;
 }
 
+function personaFormHtml() {
+  return `
+    <div class="field">
+      <textarea id="personaStyle" rows="5" placeholder="məs: Həmişə emoji istifadə et. Qısa cümlələr yaz. İstifadəçiyə 'sən' deyə müraciət et...">${escapeHtml(STATE.personaStyle)}</textarea>
+    </div>
+    <button id="savePersonaBtn" class="btn btn-gold">Yadda saxla</button>
+    <div class="msg-box" id="personaMsg"></div>`;
+}
+
+function promoFormHtml() {
+  return `
+    <div class="field-row">
+      <div class="field"><label>Kod</label><input id="promo_code" placeholder="məs: TEST2026" style="text-transform:uppercase;" /></div>
+      <div class="field"><label>Endirim (%)</label><input id="promo_discount" type="number" value="100" /></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Maks. istifadə (boş = limitsiz)</label><input id="promo_max_uses" type="number" placeholder="limitsiz" /></div>
+      <div class="field"><label>Bitmə tarixi (istəyə bağlı)</label><input id="promo_expires" type="date" /></div>
+    </div>
+    <button id="createPromoBtn" class="btn btn-gold">+ Promo kod yarat</button>
+    <div class="msg-box" id="promoMsg"></div>`;
+}
+
+function promoListHtml() {
+  if (!STATE.promoCodes || STATE.promoCodes.length === 0) {
+    return `<p style="color:var(--muted);font-size:14px;margin-top:14px;">Hələ promo kod yoxdur.</p>`;
+  }
+  return `<div style="margin-top:18px;">${STATE.promoCodes
+    .map(
+      (p) => `
+    <div class="admin-movie-row">
+      <div class="info">
+        <div>
+          <div class="name">${escapeHtml(p.code)} <span style="color:var(--muted);font-weight:500;">— ${p.discount_percent}% endirim</span></div>
+          <div class="sub">${p.used_count}${p.max_uses ? "/" + p.max_uses : ""} istifadə olunub · ${p.is_active ? "✅ aktiv" : "⏸ deaktiv"}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="icon-btn toggle-promo" data-id="${p.id}">${p.is_active ? "Deaktiv et" : "Aktiv et"}</button>
+        <button class="icon-btn del-promo" data-id="${p.id}">Sil</button>
+      </div>
+    </div>`
+    )
+    .join("")}</div>`;
+}
+
 function wireHomeEvents() {
   document.getElementById("createPlanBtn").addEventListener("click", createPlan);
   document.getElementById("saveBotPricesBtn").addEventListener("click", saveBotPrices);
+  document.getElementById("savePersonaBtn").addEventListener("click", savePersona);
+  document.getElementById("createPromoBtn").addEventListener("click", createPromo);
 
   document.querySelectorAll(".open-plan").forEach((b) =>
     b.addEventListener("click", () => openPlan(b.getAttribute("data-id")))
   );
   document.querySelectorAll(".del-plan").forEach((b) =>
     b.addEventListener("click", () => deletePlan(b.getAttribute("data-id")))
+  );
+  document.querySelectorAll(".toggle-promo").forEach((b) =>
+    b.addEventListener("click", () => togglePromo(b.getAttribute("data-id")))
+  );
+  document.querySelectorAll(".del-promo").forEach((b) =>
+    b.addEventListener("click", () => deletePromo(b.getAttribute("data-id")))
   );
 }
 
@@ -225,6 +293,74 @@ async function saveBotPrices() {
     showToast("Qiymətlər yeniləndi ✅");
   } catch (e) {
     msg.textContent = e.message;
+  }
+}
+
+async function savePersona() {
+  const msg = document.getElementById("personaMsg");
+  try {
+    await api("/api/admin-actions", {
+      method: "POST",
+      body: JSON.stringify({ action: "update_persona", persona_style: document.getElementById("personaStyle").value }),
+    });
+    STATE.personaStyle = document.getElementById("personaStyle").value;
+    showToast("Yadda saxlandı ✅");
+  } catch (e) {
+    msg.textContent = e.message;
+  }
+}
+
+async function createPromo() {
+  const msg = document.getElementById("promoMsg");
+  const code = document.getElementById("promo_code").value.trim();
+  const discount = document.getElementById("promo_discount").value;
+  const maxUses = document.getElementById("promo_max_uses").value;
+  const expires = document.getElementById("promo_expires").value;
+
+  if (!code) {
+    msg.textContent = "Kod yaz.";
+    return;
+  }
+
+  try {
+    await api("/api/admin-actions", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "create_promo",
+        code,
+        discount_percent: discount,
+        max_uses: maxUses || null,
+        expires_at: expires ? new Date(expires).toISOString() : null,
+      }),
+    });
+    STATE = await api("/api/admin-state");
+    renderHome();
+    showToast("Promo kod yaradıldı ✅");
+  } catch (e) {
+    msg.textContent = e.message;
+  }
+}
+
+async function togglePromo(id) {
+  try {
+    await api("/api/admin-actions", { method: "POST", body: JSON.stringify({ action: "toggle_promo", promo_id: id }) });
+    STATE = await api("/api/admin-state");
+    renderHome();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+async function deletePromo(id) {
+  const ok = await confirmDialog("Bu promo kodu silmək istəyirsən?");
+  if (!ok) return;
+  try {
+    await api("/api/admin-actions", { method: "POST", body: JSON.stringify({ action: "delete_promo", promo_id: id }) });
+    STATE = await api("/api/admin-state");
+    renderHome();
+    showToast("Silindi");
+  } catch (e) {
+    showToast(e.message);
   }
 }
 

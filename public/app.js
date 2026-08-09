@@ -31,7 +31,6 @@ if (tgUid) {
 
 async function loadData() {
   const genresRoot = document.getElementById("genresRoot");
-  const teaserEl = document.getElementById("teaser");
 
   try {
     const res = await fetch("/api/public-plans");
@@ -42,21 +41,11 @@ async function loadData() {
         <div class="empty-state">
           Hazırda aktiv tövsiyə yoxdur. Tezliklə yeni planlar açılacaq 🎬
         </div>`;
-      teaserEl.style.display = "none";
       document.getElementById("weekLabel").style.display = "none";
       return;
     }
 
     document.getElementById("weekLabel").style.display = "none";
-
-    if (STATE.teaser && STATE.teaser.length > 0) {
-      teaserEl.innerHTML = STATE.teaser
-        .map((m) => `<img src="${escapeAttr(m.poster)}" alt="${escapeAttr(m.title)}" loading="lazy" />`)
-        .join("");
-    } else {
-      teaserEl.style.display = "none";
-    }
-
     renderGenres();
   } catch (e) {
     genresRoot.innerHTML = `<div class="empty-state">Nəsə səhv getdi, bir az sonra yenidən cəhd et 🙏</div>`;
@@ -167,17 +156,24 @@ async function handleOrder(planId) {
   const buttons = document.querySelectorAll("#plansRoot .btn-select");
   buttons.forEach((b) => (b.disabled = true));
 
+  const promoCode = (document.getElementById("promoInput").value || "").trim();
+
   try {
     const res = await fetch("/api/public-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId, telegramUserId: getTelegramUserId() }),
+      body: JSON.stringify({ planId, telegramUserId: getTelegramUserId(), promoCode: promoCode || undefined }),
     });
     const data = await res.json();
 
     if (!res.ok || data.error) {
       msgEl.textContent = data.error || "Sifariş yaradıla bilmədi.";
       buttons.forEach((b) => (b.disabled = false));
+      return;
+    }
+
+    if (data.free) {
+      window.location.href = `/result.html?order=${encodeURIComponent(data.orderId)}`;
       return;
     }
 

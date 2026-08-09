@@ -116,5 +116,66 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  if (action === "update_persona") {
+    await setSetting("persona_style", String(b.persona_style || "").trim());
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  if (action === "create_promo") {
+    if (!b.code || !String(b.code).trim()) {
+      res.status(400).json({ error: "Kod lazımdır." });
+      return;
+    }
+    const { data, error } = await supabase
+      .from("promo_codes")
+      .insert({
+        code: String(b.code).trim().toUpperCase(),
+        discount_percent: b.discount_percent ? Number(b.discount_percent) : 100,
+        max_uses: b.max_uses ? Number(b.max_uses) : null,
+        expires_at: b.expires_at || null,
+      })
+      .select()
+      .single();
+    if (error) {
+      res.status(500).json({ error: error.message.includes("duplicate") ? "Bu kod artıq mövcuddur." : error.message });
+      return;
+    }
+    res.status(200).json({ promo: data });
+    return;
+  }
+
+  if (action === "toggle_promo") {
+    if (!b.promo_id) {
+      res.status(400).json({ error: "promo_id yoxdur" });
+      return;
+    }
+    const { data: current } = await supabase.from("promo_codes").select("is_active").eq("id", b.promo_id).single();
+    const { error } = await supabase
+      .from("promo_codes")
+      .update({ is_active: !current?.is_active })
+      .eq("id", b.promo_id);
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  if (action === "delete_promo") {
+    if (!b.promo_id) {
+      res.status(400).json({ error: "promo_id yoxdur" });
+      return;
+    }
+    const { error } = await supabase.from("promo_codes").delete().eq("id", b.promo_id);
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+    res.status(200).json({ ok: true });
+    return;
+  }
+
   res.status(400).json({ error: "Naməlum əməliyyat" });
 }

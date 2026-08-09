@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { supabase } from "../lib/supabase";
 import { createPayriffOrder } from "../lib/payriff";
 import { getMoviesForPlan } from "../lib/movies";
+import { deliverMoviesForSubscription } from "../lib/deliver";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "GET") {
@@ -57,6 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = req.body || {};
     const planId = body.planId as string;
     const telegramUserId: number | null = body.telegramUserId ? Number(body.telegramUserId) : null;
+    const promoCodeInput: string | null = body.promoCode ? String(body.promoCode).trim().toUpperCase() : null;
 
     if (!planId) {
       res.status(400).json({ error: "planId yoxdur" });
@@ -75,6 +77,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
+    let amount = Number(plan.price);
+    let promo: any = null;
+
+    if (promoCodeInput) {
+      const { data: foundPromo } = await supabase
+        .from("promo_codes")
+        .select("*")
+        .eq("code", promoCodeInput)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (!foundPromo) {
+        res.status(400).json({ error: "Promo kod tapılmadı və ya aktiv deyil." });
+        return;
+      }
+      if (foundPromo.expires_at && new Date(foundPromo.expires_at) < new Date()) {
+        res.status(400).json({ error: "Promo kodun vaxtı bitib." });
+        return;
+      }
+      if (foundPromo.max_uses !== null && foundPromo.used_count >= foundPromo.max_uses) {
+        res.status(400).json({ error: "Promo kodun limiti bitib." });
+        return;
+      }
+
+      promo = foundPromo;
+      amount = Math.max(0, Math.round(plan.price * (1 - promo.discount_percent / 100) * 100) / 100);
+    }
+
     if (telegramUserId) {
       await supabase.from("users").upsert({ id: telegramUserId });
     }
@@ -86,9 +116,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         plan_id: plan.id,
         genre_id: plan.genre_id,
         status: "pending",
-        amount: plan.price,
+        amount,
         currency: plan.currency,
         source: telegramUserId ? "miniapp" : "web",
+        promo_code: promo ? promo.code : null,
       })
       .select()
       .single();
@@ -98,10 +129,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
+    // Promo kod qiyməti sıfıra endiribsə, Payriff-ə ehtiyac yoxdur — birbaşa çatdırırıq
+    if (amount <= 0) {
+      if (promo) {
+        await supabase.from("promo_codes").update({ used_count: promo.used_count + 1 }).eq("id", promo.id);
+      }
+      await deliverMoviesForSubscription(sub.id);
+      res.status(200).json({ free: true, orderId: sub.id });
+      return;
+    }
+
     const base = process.env.PUBLIC_BASE_URL || "";
     const result = await createPayriffOrder({
       orderId: sub.id,
-      amount: plan.price,
+      amount,
       description: `MitoFilm — ${plan.title}`,
       approveUrl: `${base}/result.html?order=${sub.id}`,
       cancelUrl: `${base}/result.html?order=${sub.id}&cancelled=1`,
@@ -111,6 +152,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!result.ok) {
       res.status(500).json({ error: result.error });
       return;
+    }
+
+    if (promo) {
+      await supabase.from("promo_codes").update({ used_count: promo.used_count + 1 }).eq("id", promo.id);
     }
 
     await supabase

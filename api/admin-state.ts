@@ -10,11 +10,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const [genres, plans, botPriceGenre, botPriceMixed] = await Promise.all([
+  const [genres, plans, botPriceGenre, botPriceMixed, personaStyle, promoCodes] = await Promise.all([
     getGenres(),
     getAllAdminPlans(),
     getSetting("price_genre"),
     getSetting("price_mixed"),
+    getSetting("persona_style"),
+    supabase.from("promo_codes").select("*").order("created_at", { ascending: false }).then((r) => r.data || []),
   ]);
 
   const planIds = plans.map((p: any) => p.id);
@@ -39,5 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       movieCount: counts[p.id] || 0,
     })),
     botPrices: { genre: botPriceGenre || "3.00", mixed: botPriceMixed || "5.00" },
+    personaStyle: personaStyle || "",
+    promoCodes,
   });
 }

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { getSetting } from "./supabase";
 
 // Diqqət: OpenAI SDK-sı, açar olmadan constructor çağırılanda xəta atır.
 // Ona görə client-i YALNIZ lazım olanda (funksiya çağırılanda) yaradırıq —
@@ -16,6 +17,17 @@ Robotik ifadələr işlətmə ("Bu film sizin üçün tövsiyə olunur" kimi qə
 Yalnız Azərbaycan dilində, təbii və müasir dildə yaz — Türkiyə türkcəsi və ya rus/ingilis dilindən
 sözbəsöz tərcümə kimi səslənməsin. Azərbaycan əlifbasından düzgün istifadə et (ə, ı, ö, ü, ğ, ç, ş).
 Cavabların 2-4 cümlədən çox olmasın.`;
+
+// Admin panelində ("MitoFilm-in səsi") yazılan əlavə üslub təlimatları varsa,
+// onları da əsas persona-nın üstünə əlavə edirik. Bu, AI-nin "öyrənməsinin" praktik
+// yoludur — həqiqi özbaşına öyrənmə deyil, admin özü nümunə/qeyd yazıb tənzimləyir.
+async function getFullPersonaPrompt(): Promise<string> {
+  const custom = await getSetting("persona_style");
+  if (custom && custom.trim()) {
+    return `${PERSONA_SYSTEM_PROMPT}\n\nAdmin-in əlavə üslub qeydləri (bunlara da riayət et):\n${custom.trim()}`;
+  }
+  return PERSONA_SYSTEM_PROMPT;
+}
 
 export async function generateMitoReview(movie: {
   title: string;
@@ -37,7 +49,7 @@ Bu film üçün MitoFilm-in öz üslubunda qısa bir rəy/tövsiyə yaz (2-4 cü
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: PERSONA_SYSTEM_PROMPT },
+      { role: "system", content: await getFullPersonaPrompt() },
       { role: "user", content: userPrompt },
     ],
     temperature: 0.8,
@@ -58,7 +70,7 @@ export async function generateGreeting(userName: string): Promise<string> {
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: PERSONA_SYSTEM_PROMPT },
+        { role: "system", content: await getFullPersonaPrompt() },
         {
           role: "user",
           content: `İstifadəçinin adı: ${userName}. Onu adı ilə səmimi salamla, bu gün necə olduğunu soruş,
@@ -91,7 +103,8 @@ export async function chatConcierge(params: {
     };
   }
 
-  const systemPrompt = `${PERSONA_SYSTEM_PROMPT}
+  const basePersona = await getFullPersonaPrompt();
+  const systemPrompt = `${basePersona}
 
 Sən MitoFilm-in Telegram botusan və istifadəçi ilə canlı söhbət edirsən. Məqsədin onun HANSI JANRDA
 film istədiyini anlamaqdır. Mövcud janrlar: ${params.genreNames.join(", ")}. Əgər istifadəçi qarışıq/hamısı/

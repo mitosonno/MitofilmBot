@@ -157,12 +157,28 @@ Bu, Telegram botundan TAM ASILI DEYİL — istifadəçi birbaşa saytda bilet se
 
 Bu planların qiymətlərini Telegram-da `/admin` > "🌐 Sayt qiymətləri" ilə dəyişə bilərsən (bot özü isə ayrıca, sadə həftəlik qiymətlərlə işləyir — "💰 Bot qiymətləri").
 
-**Vacib:** bu funksiya üçün aşağıdakı 5 migration faylını da Supabase SQL Editor-da (schema.sql-dan sonra) sırayla işə salmaq lazımdır:
+**Vacib:** bu funksiya üçün aşağıdakı 6 migration faylını da Supabase SQL Editor-da (schema.sql-dan sonra) sırayla işə salmaq lazımdır:
 1. `db/migration_web.sql` — Telegram-sız (veb) sifarişlərə icazə verir
 2. `db/migration_plans.sql` — köhnə müddətli planlar üçün (legacy, botun mətn-menyusu üçün saxlanılır)
 3. `db/migration_contact.sql` — istifadəçi məlumatları (ad/telefon/email) və onboarding üçün
 4. `db/migration_schedule.sql` — hər film üçün tövsiyə olunan gün/saat üçün
 5. `db/migration_plans_v2.sql` — **əsas model**: admin-in özünün yaratdığı Tövsiyə Planları + poster şəkilləri üçün fayl anbarı
+6. `db/migration_promo.sql` — promo kodlar (pulsuz/endirimli test girişi) üçün
+
+## Promo kodlar
+
+Admin panelində ("Promo kodlar" bölməsi) admin kod yarada bilər (məs: `TEST2026`, 100% endirim) —
+istifadəçi saytda plan seçəndə promo kodu yazıb Payriff-ə ehtiyac olmadan pulsuz nəticəni ala bilir.
+Bu, xüsusilə Payriff hələ qurulmayanda tam axını sınamaq üçün faydalıdır. Kodlar limitli istifadə
+sayı və bitmə tarixi ilə də təyin oluna bilər.
+
+## MitoFilm-in səsi
+
+Admin panelində bir mətn sahəsi var — bura yazdığın qeydlər (məs: "həmişə 🎬 emoji istifadə et",
+"daha qısa yaz") botun salamlaşma və söhbət tərzinə avtomatik əlavə olunur. Bu, həqiqi maşın
+öyrənməsi deyil (OpenAI-ın modeli fine-tune olunmur) — sadəcə hər sorğuya əlavə təlimat kimi
+göndərilir. Amma praktik nəticə eynidir: nə qədər çox nümunə/qeyd yazsan, bot bir o qədər sənin
+istədiyin kimi səslənər, və istənilən vaxt dəyişə bilərsən.
 
 ## Tövsiyə Planları (əsas model)
 
