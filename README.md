@@ -101,16 +101,18 @@ küncünə bax, "Yeni tövsiyə al" yazısını görməlisən.
 ## 9. Botdan istifadə
 
 **İstifadəçi tərəfi:**
-- `/start` — ilk dəfə yazanda bot ad, telefon (paylaş düyməsi ilə) və email soruşur, sonra əsas menyu açılır
-- Söhbətin sol-alt küncündəki **"Yeni tövsiyə al"** düyməsi → sayt Telegram daxilində (Mini App kimi) açılır, janr + plan seçib ödəniş edilir
-- Əsas menyudakı köhnə mətn-əsaslı axın (Janra görə seç / Qarışıq) da paralel işləyir
-- `/mysubs` — abunəliklərin
-- `/help` — kömək
+- `/start` — ilk dəfə yazanda bot ad, telefon (paylaş düyməsi ilə) və email soruşur
+- Sonra bot **MitoFilm-in canlı agenti** kimi salamlayır (OpenAI ilə, "necəsən, hansı janrda film istəyirsən" tərzində) — istifadəçi janrı SƏRBƏST YAZA bilər (məs: "qorxu", "bilmirəm") YA DA aşağıdakı düymələrdən seçə bilər
+- Janr müəyyən olunan kimi, o janr üçün admin-in yaratdığı **YAYIMLANMIŞ planlar** (məs: "1 film", "7 film", "30 film" — admin nə adlandırıbsa) düymələr şəklində göstərilir
+- Plan seçiləndə ödəniş linki göndərilir, ödəniş bitəndə nəticə linki (`result.html`) açılır
+- Söhbətin sol-alt küncündəki **"Yeni tövsiyə al"** sabit düyməsi → istənilən vaxt sayt Telegram daxilində (Mini App) açılır, janr+plan seçib bilavasitə ödəniş edilir (agentlə söhbətə ehtiyac olmadan)
+- `/mysubs` — abunəliklərin, `/help` — kömək
+
+**Qeyd:** `OPENAI_API_KEY` təyin olunmayıbsa, bot yenə işləyir — sadəcə salamlaşma və janr tanıma sadə (AI-sız) məntiqlə aparılır, daha az "canlı" səslənir.
 
 **Admin tərəfi** (yalnız `ADMIN_TELEGRAM_IDS`-də olan id-lər üçün):
-- `/admin` yazanda bot birbaşa **Mini App-ın admin panelini** açan düymə göndərir — bütün idarəetmə (həftə yaratmaq, film əlavə/redaktə/silmək, yayımlamaq, qiymətləri dəyişmək) həmin panel daxilində, formalarla edilir
+- `/admin` yazanda bot birbaşa **Mini App-ın admin panelini** açan düymə göndərir — bütün idarəetmə (plan yaratmaq, filmlərini idarə etmək, yayımlamaq, silmək) həmin panel daxilində, formalarla edilir
 - Admin panel yalnız Telegram-ın rəsmi doğrulama alqoritmi ilə təsdiqlənən, `ADMIN_TELEGRAM_IDS`-də olan istifadəçilər üçün açılır — başqası cəhd etsə "Bu bölmə yalnız admin üçündür" görür
-- Botun köhnə mətn-əsaslı admin axını (`/admin` → düymələrlə sual-cavab) da kodda saxlanılıb, ehtiyac olarsa geri qaytarıla bilər
 
 
 ## Layihə strukturu

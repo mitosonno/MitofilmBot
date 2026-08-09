@@ -1,17 +1,17 @@
 import { Bot, InlineKeyboard, Keyboard } from "grammy";
 import {
   getGenres,
-  getLatestPublishedWeek,
   upsertUser,
-  getSetting,
   supabase,
   getUser,
   getUserSession,
   setUserSession,
   clearUserSession,
+  getPublishedPlansForGenre,
 } from "./supabase";
 import { T } from "./texts";
 import { createPayriffOrder } from "./payriff";
+import { generateGreeting, chatConcierge } from "./openai";
 import { registerAdminHandlers, registerAddMovieSaveHandler, isAdmin } from "./admin";
 
 let botInstance: Bot | null = null;
@@ -29,16 +29,16 @@ export function getBot(): Bot {
       username: ctx.from.username,
       first_name: ctx.from.first_name,
     });
-    await ctx.reply(T.welcome(ctx.from.first_name || ""));
 
     const user = await getUser(ctx.from.id);
     if (!user?.phone || !user?.email) {
+      await ctx.reply(T.welcome(ctx.from.first_name || ""));
       await setUserSession(ctx.from.id, { step: "name" });
       await ctx.reply(T.onboardingAskName);
       return;
     }
 
-    await sendMainMenu(ctx);
+    await sendConciergeGreeting(ctx);
   });
 
   bot.on("message:contact", async (ctx) => {
@@ -82,7 +82,27 @@ export function getBot(): Bot {
       await supabase.from("users").update({ email: text }).eq("id", ctx.from.id);
       await clearUserSession(ctx.from.id);
       await ctx.reply(T.onboardingDone(ctx.from.first_name || ""));
-      await sendMainMenu(ctx);
+      await sendConciergeGreeting(ctx);
+      return;
+    }
+
+    if (session.step === "awaiting_genre") {
+      const genres = await getGenres();
+      const result = await chatConcierge({ userMessage: text, genreNames: genres.map((g) => g.name_az) });
+      await ctx.reply(result.reply);
+
+      if (result.genre) {
+        if (result.genre === "Qarışıq") {
+          await presentPlansForGenre(ctx, null);
+          return;
+        }
+        const matched = genres.find((g) => g.name_az.toLowerCase() === result.genre!.toLowerCase());
+        if (matched) {
+          await presentPlansForGenre(ctx, matched.id);
+          return;
+        }
+      }
+      // aydın olmadı — sessiya "awaiting_genre" olaraq qalır, istifadəçi yenidən yaza bilər
       return;
     }
 
@@ -101,27 +121,12 @@ export function getBot(): Bot {
       kb.text(g.name_az, `user_genre:${g.id}`);
       if (i % 2 === 1) kb.row();
     });
-    kb.row().text(T.backBtn, "menu:main");
     await ctx.reply(T.chooseGenre, { reply_markup: kb });
   });
 
   bot.callbackQuery("menu:mixed", async (ctx) => {
     await ctx.answerCallbackQuery();
-    const price = (await getSetting("price_mixed")) || "5.00";
-    const currency = (await getSetting("currency")) || "AZN";
-    const kb = new InlineKeyboard()
-      .text(T.btnPay, "pay:mixed")
-      .row()
-      .text(T.backBtn, "menu:main");
-    await ctx.reply(T.orderSummaryMixed(price, currency), {
-      parse_mode: "Markdown",
-      reply_markup: kb,
-    });
-  });
-
-  bot.callbackQuery("menu:main", async (ctx) => {
-    await ctx.answerCallbackQuery();
-    await sendMainMenu(ctx);
+    await presentPlansForGenre(ctx, null);
   });
 
   bot.callbackQuery("menu:mysubs", async (ctx) => {
@@ -137,55 +142,55 @@ export function getBot(): Bot {
   bot.callbackQuery(/^user_genre:(\d+)$/, async (ctx) => {
     await ctx.answerCallbackQuery();
     const genreId = Number(ctx.match![1]);
-    const genres = await getGenres();
-    const genre = genres.find((g) => g.id === genreId);
-    const price = (await getSetting("price_genre")) || "3.00";
-    const currency = (await getSetting("currency")) || "AZN";
-    const kb = new InlineKeyboard()
-      .text(T.btnPay, `pay:genre:${genreId}`)
-      .row()
-      .text(T.backBtn, "menu:by_genre");
-    await ctx.reply(T.orderSummaryGenre(genre?.name_az || "", price, currency), {
-      parse_mode: "Markdown",
-      reply_markup: kb,
-    });
+    await presentPlansForGenre(ctx, genreId);
   });
 
-  bot.callbackQuery(/^pay:(mixed|genre):?(\d+)?$/, async (ctx) => {
+  bot.callbackQuery(/^buyplan:(.+)$/, async (ctx) => {
     await ctx.answerCallbackQuery();
     if (!ctx.from) return;
-    const kind = ctx.match![1];
-    const genreId = ctx.match![2] ? Number(ctx.match![2]) : null;
+    const planId = ctx.match![1];
 
-    const week = await getLatestPublishedWeek();
-    if (!week) return ctx.reply(T.noMoviesYet);
+    const { data: plan } = await supabase
+      .from("plans")
+      .select("*")
+      .eq("id", planId)
+      .eq("status", "published")
+      .maybeSingle();
 
-    const price =
-      kind === "mixed"
-        ? (await getSetting("price_mixed")) || "5.00"
-        : (await getSetting("price_genre")) || "3.00";
+    if (!plan) {
+      await ctx.reply(T.genericError);
+      return;
+    }
 
     const { data: sub, error } = await supabase
       .from("subscriptions")
       .insert({
         user_id: ctx.from.id,
-        week_id: week.id,
-        genre_id: genreId,
+        plan_id: plan.id,
+        genre_id: plan.genre_id,
         status: "pending",
-        amount: parseFloat(price),
-        currency: (await getSetting("currency")) || "AZN",
+        amount: plan.price,
+        currency: plan.currency,
+        source: "telegram",
       })
       .select()
       .single();
 
-    if (error || !sub) return ctx.reply(T.genericError);
+    if (error || !sub) {
+      await ctx.reply(T.genericError);
+      return;
+    }
 
     await ctx.reply(T.creatingPayment);
 
+    const base = process.env.PUBLIC_BASE_URL || "";
     const result = await createPayriffOrder({
       orderId: sub.id,
-      amount: parseFloat(price),
-      description: `MitoFilm — ${week.week_label}`,
+      amount: plan.price,
+      description: `MitoFilm — ${plan.title}`,
+      approveUrl: `${base}/result.html?order=${sub.id}`,
+      cancelUrl: `${base}/result.html?order=${sub.id}&cancelled=1`,
+      declineUrl: `${base}/result.html?order=${sub.id}&declined=1`,
     });
 
     if (!result.ok) {
@@ -208,26 +213,46 @@ export function getBot(): Bot {
   return bot;
 }
 
-async function sendMainMenu(ctx: any) {
-  const base = process.env.PUBLIC_BASE_URL || "";
+// İstifadəçini adı ilə, MitoFilm-in canlı səsi ilə salamlayır və janr soruşur.
+// Cavab gözlənilən "awaiting_genre" sessiyası açılır ki, sərbəst yazılan mesaj da tutulsun.
+async function sendConciergeGreeting(ctx: any) {
+  if (!ctx.from) return;
+  const greeting = await generateGreeting(ctx.from.first_name || "dostum");
+  await ctx.reply(greeting);
+  await setUserSession(ctx.from.id, { step: "awaiting_genre" });
+
+  const genres = await getGenres();
   const kb = new InlineKeyboard();
-  if (base) kb.webApp(T.menuOpenSite, base).row();
-  kb
-    .text(T.btnByGenre, "menu:by_genre")
-    .row()
-    .text(T.btnMixed, "menu:mixed")
-    .row()
-    .text(T.btnMySubs, "menu:mysubs")
-    .row()
-    .text(T.btnHelp, "menu:help");
-  await ctx.reply(T.mainMenuPrompt, { reply_markup: kb });
+  genres.forEach((g, i) => {
+    kb.text(g.name_az, `user_genre:${g.id}`);
+    if (i % 2 === 1) kb.row();
+  });
+  kb.row().text(T.btnMixed, "menu:mixed");
+  await ctx.reply("Janrını yaz (məs: \"qorxu\"), ya da aşağıdan seç:", { reply_markup: kb });
+}
+
+// Seçilmiş janr (və ya Qarışıq — null) üçün admin-in yaratdığı YAYIMLANMIŞ planları göstərir.
+async function presentPlansForGenre(ctx: any, genreId: number | null) {
+  const plans = await getPublishedPlansForGenre(genreId);
+
+  if (plans.length === 0) {
+    await ctx.reply("Təəssüf ki, bu janr üçün hazırda aktiv plan yoxdur. Başqa janr sınaya bilərsən 🎬");
+    return;
+  }
+
+  const kb = new InlineKeyboard();
+  plans.forEach((p) => {
+    kb.text(`${p.title} — ${p.price} ${p.currency}`, `buyplan:${p.id}`).row();
+  });
+
+  await ctx.reply("Bunlardan birini seç:", { reply_markup: kb });
 }
 
 async function sendMySubs(ctx: any) {
   if (!ctx.from) return;
   const { data: subs } = await supabase
     .from("subscriptions")
-    .select("*, weeks(week_label), genres(name_az)")
+    .select("*, plans(title, genre_id, genres(name_az))")
     .eq("user_id", ctx.from.id)
     .order("created_at", { ascending: false })
     .limit(10);
@@ -239,9 +264,9 @@ async function sendMySubs(ctx: any) {
 
   const lines = subs.map((s: any) =>
     T.subLine(
-      s.genres?.name_az || "Qarışıq",
+      s.plans?.genre_id ? s.plans?.genres?.name_az || "Janr" : "Qarışıq",
       statusText(s.status),
-      s.weeks?.week_label || ""
+      s.plans?.title || ""
     )
   );
   await ctx.reply([T.mySubsHeader, ...lines].join("\n"));
