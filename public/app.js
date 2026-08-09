@@ -16,6 +16,14 @@ function getTelegramUserId() {
   }
 }
 
+// Yalnız Telegram Mini App daxilindəyiksə "Tarixçəm" linkini göstər
+const tgUid = getTelegramUserId();
+if (tgUid) {
+  const link = document.getElementById("historyLink");
+  link.href = `/history.html?tg=${tgUid}`;
+  link.style.display = "inline-block";
+}
+
 async function loadWeek() {
   const genresRoot = document.getElementById("genresRoot");
   const weekLabelEl = document.getElementById("weekLabel");

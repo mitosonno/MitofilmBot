@@ -155,12 +155,13 @@ Bu, Telegram botundan TAM ASILI DEYİL — istifadəçi birbaşa saytda bilet se
 
 Bu planların qiymətlərini Telegram-da `/admin` > "🌐 Sayt qiymətləri" ilə dəyişə bilərsən (bot özü isə ayrıca, sadə həftəlik qiymətlərlə işləyir — "💰 Bot qiymətləri").
 
-**Vacib:** bu funksiya üçün aşağıdakı 3 migration faylını da Supabase SQL Editor-da (schema.sql-dan sonra) sırayla işə salmaq lazımdır:
+**Vacib:** bu funksiya üçün aşağıdakı 4 migration faylını da Supabase SQL Editor-da (schema.sql-dan sonra) sırayla işə salmaq lazımdır:
 1. `db/migration_web.sql` — Telegram-sız (veb) sifarişlərə icazə verir
 2. `db/migration_plans.sql` — müddətli planlar (1 günlük/7 günlük/1 aylıq) üçün lazımi sütun və qiymətlər
 3. `db/migration_contact.sql` — istifadəçi məlumatları (ad/telefon/email) və onboarding üçün
+4. `db/migration_schedule.sql` — hər film üçün tövsiyə olunan gün/saat üçün
 
-Sayt eyni Vercel layihəsində, `/` ünvanında avtomatik görünür (əlavə deploy addımı lazım deyil).
+Sayt eyni Vercel layihəsində, `/` ünvanında avtomatik görünür (əlavə deploy addımı lazım deyil). Telegram Mini App daxilində açılanda (bot düyməsi ilə) istifadəçi avtomatik tanınır, sifariş onun Telegram hesabına bağlanır, və `/history.html` səhifəsindən keçmiş tövsiyələrinə baxa bilir.
 
 ## Növbəti addımlar (istəyə görə genişlənə bilər)
 

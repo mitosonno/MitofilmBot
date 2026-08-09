@@ -34,6 +34,8 @@ export type Movie = {
   mito_review: string | null;
   trailer_url: string | null;
   official_watch_url: string;
+  recommended_day: string | null;
+  recommended_time: string | null;
 };
 
 export type Subscription = {

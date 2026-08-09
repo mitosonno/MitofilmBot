@@ -22,6 +22,25 @@ export function isAdmin(id: number) {
   return ADMIN_IDS.includes(id);
 }
 
+const DAYS = [
+  "Bazar ertəsi",
+  "Çərşənbə axşamı",
+  "Çərşənbə",
+  "Cümə axşamı",
+  "Cümə",
+  "Şənbə",
+  "Bazar",
+];
+
+function dayKeyboard() {
+  const kb = new InlineKeyboard();
+  DAYS.forEach((d, i) => {
+    kb.text(d, `am_day:${i}`);
+    if (i % 2 === 1) kb.row();
+  });
+  return kb;
+}
+
 export function adminMenuKeyboard() {
   return new InlineKeyboard()
     .text(T.adminBtnNewWeek, "admin:new_week").row()
@@ -78,6 +97,18 @@ export async function registerAdminHandlers(bot: Bot) {
     await setAdminSession(id, session);
     await ctx.answerCallbackQuery();
     await ctx.reply(T.adminAskTitle);
+  });
+
+  bot.callbackQuery(/^am_day:(\d)$/, async (ctx) => {
+    const id = ctx.from.id;
+    if (!isAdmin(id)) return ctx.answerCallbackQuery();
+    const session = await getAdminSession(id);
+    if (!session || session.flow !== "add_movie") return ctx.answerCallbackQuery();
+    session.data.recommended_day = DAYS[Number(ctx.match![1])];
+    session.step = "time";
+    await setAdminSession(id, session);
+    await ctx.answerCallbackQuery();
+    await ctx.reply(T.adminAskTime);
   });
 
   bot.callbackQuery("admin:list_movies", async (ctx) => {
@@ -322,6 +353,13 @@ async function handleAddMovieStep(ctx: any, adminId: number, session: any, text:
 
     case "watch_url": {
       d.official_watch_url = text;
+      session.step = "day";
+      await setAdminSession(adminId, session);
+      return ctx.reply(T.adminAskDay, { reply_markup: dayKeyboard() });
+    }
+
+    case "time": {
+      d.recommended_time = skip ? null : text;
       session.step = "confirm";
       await setAdminSession(adminId, session);
       const kb = { reply_markup: { inline_keyboard: [[{ text: T.adminBtnSaveMovie, callback_data: "am_save" }]] } };
@@ -354,6 +392,8 @@ export function registerAddMovieSaveHandler(bot: Bot) {
       mito_review: d.mito_review,
       trailer_url: d.trailer_url,
       official_watch_url: d.official_watch_url,
+      recommended_day: d.recommended_day,
+      recommended_time: d.recommended_time,
     });
 
     await clearAdminSession(id);

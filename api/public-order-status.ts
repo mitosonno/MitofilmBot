@@ -50,6 +50,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       review: m.mito_review,
       trailer: m.trailer_url,
       watch: m.official_watch_url,
+      day: m.recommended_day,
+      time: m.recommended_time,
     })),
   });
 }

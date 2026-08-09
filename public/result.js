@@ -13,6 +13,16 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+const DAY_ORDER = [
+  "Bazar ertəsi",
+  "Çərşənbə axşamı",
+  "Çərşənbə",
+  "Cümə axşamı",
+  "Cümə",
+  "Şənbə",
+  "Bazar",
+];
+
 function renderPending() {
   document.getElementById("content").innerHTML = `
     <div class="result-head">
@@ -26,7 +36,7 @@ function renderNotFound() {
   document.getElementById("content").innerHTML = `
     <div class="result-head">
       <h2>Bu sifariş tapılmadı</h2>
-      <p style="color:var(--muted)">Link köhnə ola bilər. Ana səhifədən yenidən bilet götürə bilərsən.</p>
+      <p style="color:var(--muted)">Link köhnə ola bilər. Ana səhifədən yenidən plan götürə bilərsən.</p>
     </div>`;
 }
 
@@ -38,28 +48,28 @@ function renderCancelledOrDeclined() {
     </div>`;
 }
 
-function renderPaid(data) {
-  const moviesHtml = data.movies
-    .map((m) => {
-      const metaParts = [];
-      if (m.year) metaParts.push(m.year);
-      if (m.imdb) metaParts.push(`⭐ ${m.imdb}`);
-      if (m.country) metaParts.push(m.country);
-      if (m.runtime) metaParts.push(`${m.runtime} dəq`);
+let CURRENT_MOVIES = [];
 
+function renderPaid(data) {
+  CURRENT_MOVIES = data.movies;
+
+  const sorted = [...data.movies].sort((a, b) => {
+    const ai = a.day ? DAY_ORDER.indexOf(a.day) : 99;
+    const bi = b.day ? DAY_ORDER.indexOf(b.day) : 99;
+    return ai - bi;
+  });
+
+  const cardsHtml = sorted
+    .map((m, sortedIdx) => {
+      const originalIdx = data.movies.indexOf(m);
+      const badge = m.day ? `${m.day}${m.time ? ", " + m.time : ""}` : "";
       return `
-      <div class="movie-card">
-        <img src="${escapeHtml(m.poster)}" alt="${escapeHtml(m.title)}" loading="lazy" />
-        <div class="movie-body">
-          <h3>${escapeHtml(m.title)}</h3>
-          <div class="meta">${escapeHtml(metaParts.join(" · "))}</div>
-          ${m.desc ? `<p>${escapeHtml(m.desc)}</p>` : ""}
-          ${m.review ? `<p class="review">${escapeHtml(m.review)}</p>` : ""}
-          <div class="links">
-            <a href="${escapeHtml(m.watch)}" target="_blank" rel="noopener">İndi izlə</a>
-            ${m.trailer ? `<a href="${escapeHtml(m.trailer)}" target="_blank" rel="noopener">Treyler</a>` : ""}
-          </div>
+      <div class="movie-card" data-idx="${originalIdx}">
+        <div class="movie-poster-wrap">
+          <img src="${escapeHtml(m.poster)}" alt="${escapeHtml(m.title)}" loading="lazy" />
+          ${badge ? `<span class="day-badge">${escapeHtml(badge)}</span>` : ""}
         </div>
+        <div class="card-title">${escapeHtml(m.title)}</div>
       </div>`;
     })
     .join("");
@@ -70,10 +80,54 @@ function renderPaid(data) {
       <h2>${escapeHtml(data.label)} — ${escapeHtml(data.weekLabel)}</h2>
     </div>
     ${
-      data.movies.length > 0
-        ? `<div class="movies-grid">${moviesHtml}</div>`
-        : `<div class="empty-state">Bu həftə üçün hələ film əlavə olunmayıb. Tezliklə yenilənəcək 🎬</div>`
+      sorted.length > 0
+        ? `<div class="movies-grid">${cardsHtml}</div>`
+        : `<div class="empty-state">Bu plan üçün hələ film əlavə olunmayıb. Tezliklə yenilənəcək 🎬</div>`
     }`;
+
+  document.querySelectorAll(".movie-card").forEach((card) => {
+    card.addEventListener("click", () => openModal(Number(card.getAttribute("data-idx"))));
+  });
+}
+
+function openModal(idx) {
+  const m = CURRENT_MOVIES[idx];
+  if (!m) return;
+
+  const metaParts = [];
+  if (m.year) metaParts.push(m.year);
+  if (m.imdb) metaParts.push(`⭐ ${m.imdb}`);
+  if (m.country) metaParts.push(m.country);
+  if (m.director) metaParts.push(m.director);
+  if (m.runtime) metaParts.push(`${m.runtime} dəq`);
+
+  const badge = m.day ? `${m.day}${m.time ? ", " + m.time : ""}` : "";
+
+  document.getElementById("modalSheet").innerHTML = `
+    <button class="modal-close" id="modalCloseBtn">✕</button>
+    <img src="${escapeHtml(m.poster)}" alt="${escapeHtml(m.title)}" />
+    <div class="modal-body">
+      ${badge ? `<span class="modal-day-badge">${escapeHtml(badge)}</span>` : ""}
+      <h3>${escapeHtml(m.title)}</h3>
+      <div class="modal-meta">${escapeHtml(metaParts.join(" · "))}</div>
+      ${m.desc ? `<p>${escapeHtml(m.desc)}</p>` : ""}
+      ${m.review ? `<p class="modal-review">${escapeHtml(m.review)}</p>` : ""}
+      <div class="modal-links">
+        <a href="${escapeHtml(m.watch)}" target="_blank" rel="noopener">İndi izlə</a>
+        ${m.trailer ? `<a href="${escapeHtml(m.trailer)}" target="_blank" rel="noopener">Treyler</a>` : ""}
+      </div>
+    </div>`;
+
+  const overlay = document.getElementById("modalOverlay");
+  overlay.classList.add("open");
+  document.getElementById("modalCloseBtn").addEventListener("click", closeModal);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeModal();
+  });
+}
+
+function closeModal() {
+  document.getElementById("modalOverlay").classList.remove("open");
 }
 
 async function poll(orderId, attempt = 0) {
@@ -94,9 +148,8 @@ async function poll(orderId, attempt = 0) {
       return;
     }
 
-    // hələ "pending" — davam et
     if (attempt >= 25) {
-      renderPending(); // uzun çəkirsə, sadəcə gözləmə vəziyyətində saxla
+      renderPending();
       return;
     }
     setTimeout(() => poll(orderId, attempt + 1), 2500);

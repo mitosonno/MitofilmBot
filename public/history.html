@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MitoFilm — Tarixçəm</title>
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  .hist-wrap { max-width: 640px; margin: 0 auto; padding: 48px 24px 80px; }
+  .hist-head { text-align: center; margin-bottom: 36px; }
+  .hist-list { display: flex; flex-direction: column; gap: 14px; }
+  .hist-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 18px; text-decoration: none; color: var(--ivory);
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .hist-item:hover { border-color: var(--gold-dim); transform: translateY(-2px); }
+  .hist-item .left h3 { margin: 0 0 4px; font-size: 16px; }
+  .hist-item .left span { color: var(--muted); font-size: 12.5px; }
+  .hist-item .right { color: var(--gold); font-weight: 800; font-size: 14px; }
+  .back-link { display: block; text-align: center; margin-top: 40px; color: var(--muted); text-decoration: none; }
+  .back-link:hover { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="brand">Mito<span>Film</span></a>
+</nav>
+
+<div class="hist-wrap">
+  <div class="hist-head">
+    <span class="eyebrow">Tarixçə</span>
+    <h2>Keçmiş tövsiyələrin</h2>
+  </div>
+  <div id="listRoot"></div>
+  <a href="/" class="back-link">← Ana səhifəyə qayıt</a>
+</div>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/history.js"></script>
+</body>
+</html>

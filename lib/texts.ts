@@ -107,6 +107,8 @@ export const T = {
     "MitoFilm rəyini yaz (özün yaz, ya da \"ai\" yazsan süni intellekt sənin üçün qaralama hazırlayacaq):",
   adminAskTrailer: "Treyler linkini göndər (yoxdursa \"keç\" yaz):",
   adminAskWatchUrl: "Rəsmi izləmə linkini göndər:",
+  adminAskDay: "Bu filmi hansı gün izləməyi tövsiyə edirsən?",
+  adminAskTime: "Saat neçədə? (məs: 21:00, yoxdursa \"keç\" yaz):",
 
   adminInvalidNumber: "Bu rəqəm deyil, bir də cəhd et:",
   adminSkipHint: "(keçmək üçün \"keç\" yaz)",
