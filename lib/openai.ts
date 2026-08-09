@@ -1,6 +1,12 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Diqqət: OpenAI SDK-sı, açar olmadan constructor çağırılanda xəta atır.
+// Ona görə client-i YALNIZ lazım olanda (funksiya çağırılanda) yaradırıq —
+// beləliklə OPENAI_API_KEY təyin olunmasa belə, botun qalan hissəsi normal işləyir.
+function getClient(): OpenAI | null {
+  if (!process.env.OPENAI_API_KEY) return null;
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 // MitoFilm-in persona qaydaları — yükləmiş olduğun dil sənədindən götürülüb.
 const PERSONA_SYSTEM_PROMPT = `Sən MitoFilm-in kino bloqçususan. Sadəcə texniki sistem deyilsən —
@@ -17,6 +23,11 @@ export async function generateMitoReview(movie: {
   genre?: string | null;
   shortDescription?: string | null;
 }): Promise<string> {
+  const client = getClient();
+  if (!client) {
+    return "";
+  }
+
   const userPrompt = `Film: "${movie.title}"${movie.year ? ` (${movie.year})` : ""}
 Janr: ${movie.genre || "naməlum"}
 Qısa təsvir: ${movie.shortDescription || "yoxdur"}
