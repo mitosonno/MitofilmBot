@@ -10,8 +10,7 @@ import {
   getPublishedPlansForGenre,
 } from "./supabase";
 import { T } from "./texts";
-import { createPayriffOrder } from "./payriff";
-import { generateGreeting, chatConcierge } from "./openai";
+import { chatConcierge } from "./openai";
 import { registerAdminHandlers, registerAddMovieSaveHandler, isAdmin } from "./admin";
 
 let botInstance: Bot | null = null;
@@ -149,61 +148,11 @@ export function getBot(): Bot {
     await ctx.answerCallbackQuery();
     if (!ctx.from) return;
     const planId = ctx.match![1];
-
-    const { data: plan } = await supabase
-      .from("plans")
-      .select("*")
-      .eq("id", planId)
-      .eq("status", "published")
-      .maybeSingle();
-
-    if (!plan) {
-      await ctx.reply(T.genericError);
-      return;
-    }
-
-    const { data: sub, error } = await supabase
-      .from("subscriptions")
-      .insert({
-        user_id: ctx.from.id,
-        plan_id: plan.id,
-        genre_id: plan.genre_id,
-        status: "pending",
-        amount: plan.price,
-        currency: plan.currency,
-        source: "telegram",
-      })
-      .select()
-      .single();
-
-    if (error || !sub) {
-      await ctx.reply(T.genericError);
-      return;
-    }
-
-    await ctx.reply(T.creatingPayment);
-
     const base = process.env.PUBLIC_BASE_URL || "";
-    const result = await createPayriffOrder({
-      orderId: sub.id,
-      amount: plan.price,
-      description: `MitoFilm — ${plan.title}`,
-      approveUrl: `${base}/result.html?order=${sub.id}`,
-      cancelUrl: `${base}/result.html?order=${sub.id}&cancelled=1`,
-      declineUrl: `${base}/result.html?order=${sub.id}&declined=1`,
+    const kb = new InlineKeyboard().webApp("💳 Ödəniş et", `${base}/pay.html?plan=${planId}`);
+    await ctx.reply("Ödənişi tamamlamaq üçün aşağıya bas — Mini App daxilində dərhal açılacaq:", {
+      reply_markup: kb,
     });
-
-    if (!result.ok) {
-      await ctx.reply(T.paymentFailedTryAgain);
-      return;
-    }
-
-    await supabase
-      .from("subscriptions")
-      .update({ payriff_order_id: result.payriffOrderId })
-      .eq("id", sub.id);
-
-    await ctx.reply(T.paymentLinkReady(result.paymentUrl));
   });
 
   registerAdminHandlers(bot);
@@ -217,8 +166,7 @@ export function getBot(): Bot {
 // Cavab gözlənilən "awaiting_genre" sessiyası açılır ki, sərbəst yazılan mesaj da tutulsun.
 async function sendConciergeGreeting(ctx: any) {
   if (!ctx.from) return;
-  const greeting = await generateGreeting(ctx.from.first_name || "dostum");
-  await ctx.reply(greeting);
+  await ctx.reply(T.conciergeGreeting(ctx.from.first_name || "dostum"));
   await setUserSession(ctx.from.id, { step: "awaiting_genre" });
 
   const genres = await getGenres();

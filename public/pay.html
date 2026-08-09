@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MitoFilm — Ödəniş</title>
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  .pay-wrap { max-width: 420px; margin: 0 auto; padding: 90px 24px; text-align: center; }
+  .spinner {
+    width: 34px; height: 34px; margin: 0 auto 20px;
+    border: 3px solid var(--line-strong);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="pay-wrap" id="content">
+  <div class="spinner"></div>
+  <h2>Hazırlanır...</h2>
+  <p style="color:var(--muted)">Ödəniş səhifəsinə yönləndirilirsən 🎬</p>
+</div>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/pay.js"></script>
+</body>
+</html>

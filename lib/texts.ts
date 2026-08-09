@@ -151,4 +151,7 @@ export const T = {
   onboardingAskEmail: "Son sual — email ünvanın nədir? (ödəniş qəbzin və tövsiyələrin bura da göndəriləcək)",
   onboardingInvalidEmail: "Bu email düzgün görünmür, bir də yaz:",
   onboardingDone: (name: string) => `Çox sağ ol, ${name}! İndi hazırsan 🎬`,
+
+  conciergeGreeting: (name: string) =>
+    `👋 Salam, ${name}! Mito səni salamlayır 🎬\n\nBurdasansa, deməli əsl kinomansan! Mito sənə bu gün əhvalına uyğun ən yaxşı film tövsiyələrini tapmaqda kömək edəcək.\n\nHansı janrda filmə baxmaq istəyirsən?`,
 };
