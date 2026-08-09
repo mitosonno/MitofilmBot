@@ -15,6 +15,12 @@ export async function createPayriffOrder(params: {
   orderId: string; // bizim subscription.id (uuid) — bank tərəfi üçün unikal
   amount: number;
   description: string;
+  // Veb saytdan gələn sifarişlər üçün ödənişdən sonra istifadəçinin
+  // hara qaytarılacağını override etmək olar (Telegram botunda bunlar
+  // sabit env dəyişənlərindən götürülür).
+  approveUrl?: string;
+  cancelUrl?: string;
+  declineUrl?: string;
 }): Promise<{ ok: true; paymentUrl: string; payriffOrderId: string } | { ok: false; error: string }> {
   try {
     const res = await fetch(`${BASE_URL}/api/v3/orders`, {
@@ -26,9 +32,9 @@ export async function createPayriffOrder(params: {
       body: JSON.stringify({
         body: {
           amount: params.amount,
-          approveURL: process.env.PAYRIFF_APPROVE_URL || "",
-          cancelURL: process.env.PAYRIFF_CANCEL_URL || "",
-          declineURL: process.env.PAYRIFF_DECLINE_URL || "",
+          approveURL: params.approveUrl || process.env.PAYRIFF_APPROVE_URL || "",
+          cancelURL: params.cancelUrl || process.env.PAYRIFF_CANCEL_URL || "",
+          declineURL: params.declineUrl || process.env.PAYRIFF_DECLINE_URL || "",
           description: params.description,
           orderId: params.orderId,
           language: "AZ",

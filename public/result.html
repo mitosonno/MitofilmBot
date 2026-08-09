@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MitoFilm — Sənin filmlərin</title>
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  .result-wrap { max-width: 900px; margin: 0 auto; padding: 64px 24px 80px; }
+  .result-head { text-align: center; margin-bottom: 40px; }
+  .spinner {
+    width: 34px; height: 34px; margin: 0 auto 20px;
+    border: 3px solid var(--line-strong);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .movies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 22px; }
+  .movie-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .movie-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
+  .movie-body { padding: 16px 16px 18px; }
+  .movie-body h3 { margin: 0 0 6px; font-size: 17px; }
+  .meta { color: var(--muted); font-size: 12.5px; margin-bottom: 10px; }
+  .movie-body p { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); }
+  .review { color: var(--ivory); font-style: normal; border-left: 2px solid var(--gold); padding-left: 10px; margin: 0 0 12px; font-size: 13.5px; }
+  .links a { color: var(--gold); text-decoration: none; font-weight: 700; font-size: 13.5px; margin-right: 14px; }
+  .links a:hover { text-decoration: underline; }
+  .back-link { display: block; text-align: center; margin-top: 40px; color: var(--muted); text-decoration: none; }
+  .back-link:hover { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="brand">Mito<span>Film</span></a>
+</nav>
+
+<div class="result-wrap">
+  <div id="content">
+    <div class="result-head">
+      <div class="spinner"></div>
+      <h2>Ödəniş təsdiqlənir...</h2>
+      <p style="color:var(--muted)">Bir neçə saniyə gözlə, filmlərin hazırlanır 🎬</p>
+    </div>
+  </div>
+  <a href="/" class="back-link">← Ana səhifəyə qayıt</a>
+</div>
+
+<script src="/result.js"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { T } from "./texts";
+import { getMoviesForSubscription } from "./movies";
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
@@ -25,6 +26,8 @@ async function sendMessage(chatId: number, text: string) {
 }
 
 // Ödəniş təsdiqləndikdən sonra çağırılır: abunəliyi "paid" edir və filmləri göndərir.
+// Veb saytdan gələn (Telegram-sız) sifarişlərdə user_id yoxdur — bu halda
+// sadəcə statusu "paid" edirik, nəticələr veb saytın öz nəticə səhifəsində göstərilir.
 export async function deliverMoviesForSubscription(subscriptionId: string) {
   const { data: sub } = await supabase
     .from("subscriptions")
@@ -39,13 +42,9 @@ export async function deliverMoviesForSubscription(subscriptionId: string) {
     .update({ status: "paid", paid_at: new Date().toISOString() })
     .eq("id", subscriptionId);
 
-  let query = supabase.from("movies").select("*, genres(name_az)").eq("week_id", sub.week_id);
-  if (sub.genre_id) query = query.eq("genre_id", sub.genre_id);
-  const { data: movies } = await query;
+  if (!sub.user_id) return; // veb sifarişi — Telegram-a göndərməyə ehtiyac yoxdur
 
-  const label = sub.genre_id
-    ? (movies?.[0] as any)?.genres?.name_az || "Janr"
-    : "Qarışıq";
+  const { label, movies } = await getMoviesForSubscription(sub);
 
   await sendMessage(sub.user_id, T.paymentConfirmedHeader(label));
 

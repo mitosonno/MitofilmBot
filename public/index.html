@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MitoFilm — Həftəlik kino seçkisi</title>
+<meta name="description" content="Hər həftə diqqətlə seçilmiş filmlər. Janrına görə bilet götür, ya da hamısını birdən — və 7 günlük tövsiyə siyahını al." />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="brand">Mito<span>Film</span></a>
+</nav>
+
+<header class="hero">
+  <span class="eyebrow">Həftəlik kino bileti</span>
+  <h1>Bu həftə hansı<br><em>filmə</em> gedirsən?</h1>
+  <p class="sub">MitoFilm hər həftə yeni filmlər seçir, sən sadəcə bileti götür — janrına uyğun, ya da hamısını birdən.</p>
+  <div class="cta-row">
+    <a href="#biletler" class="btn btn-gold">Biletlərə bax</a>
+  </div>
+</header>
+
+<div class="teaser" id="teaser"></div>
+
+<section class="block">
+  <div class="block-head">
+    <span class="eyebrow">Necə işləyir</span>
+    <h2>Üç addım, bir bilet</h2>
+  </div>
+  <div class="steps">
+    <div class="step">
+      <div class="num">01</div>
+      <h3>Bilet seç</h3>
+      <p>Janr seç, ya da bütün janrları əhatə edən qarışıq bileti götür.</p>
+    </div>
+    <div class="step">
+      <div class="num">02</div>
+      <h3>Ödə</h3>
+      <p>Kartınla təhlükəsiz ödəniş et, cəmi bir neçə saniyə çəkir.</p>
+    </div>
+    <div class="step">
+      <div class="num">03</div>
+      <h3>İzlə</h3>
+      <p>7 günlük film siyahın — posterlə, rəylə, izləmə linki ilə qarşında.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="biletler">
+  <div class="block-head">
+    <span class="eyebrow">Bu həftə</span>
+    <h2>Biletini seç</h2>
+  </div>
+  <div id="weekLabel" class="week-label"></div>
+  <div id="ticketsRoot"></div>
+  <div class="order-msg" id="orderMsg"></div>
+</section>
+
+<footer>
+  <span class="brand">MitoFilm</span>
+  həftəlik kino seçkisi
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -112,6 +112,19 @@ mitofilm-bot/
     schema.sql                   → Supabase sxemi
 ```
 
+## Veb sayt (landing + ödəniş + nəticələr)
+
+`public/` qovluğu tam girişsiz bir veb sayt təqdim edir:
+
+- `public/index.html` — əsas səhifə: bu həftənin biletləri (janr + qarışıq), qiymətlər
+- `public/result.html` — ödənişdən sonra istifadəçinin yönləndirildiyi səhifə: ödəniş statusunu yoxlayır, təsdiqlənəndə posterlərlə filmləri göstərir
+
+Bu, Telegram botundan TAM ASILI DEYİL — istifadəçi birbaşa saytda bilet seçir, Payriff ilə ödəyir, nəticəni saytda görür.
+
+**Vacib:** bu funksiya üçün `db/migration_web.sql` faylını da Supabase SQL Editor-da (schema.sql-dan sonra) işə salmaq lazımdır — bu, `subscriptions` cədvəlinə Telegram-sız sifarişlərə icazə verir.
+
+Sayt eyni Vercel layihəsində, `/` ünvanında avtomatik görünür (əlavə deploy addımı lazım deyil).
+
 ## Növbəti addımlar (istəyə görə genişlənə bilər)
 
 - Ləğv etmə / geri qaytarma axını

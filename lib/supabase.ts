@@ -38,13 +38,14 @@ export type Movie = {
 
 export type Subscription = {
   id: string;
-  user_id: number;
+  user_id: number | null;
   week_id: string;
   genre_id: number | null;
   status: "pending" | "paid" | "failed" | "cancelled";
   amount: number;
   currency: string;
   payriff_order_id: string | null;
+  source: "telegram" | "web";
 };
 
 export async function getSetting(key: string): Promise<string | null> {
