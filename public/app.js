@@ -1,6 +1,21 @@
 let STATE = null; // /api/public-week cavabı
 let selectedGenreId = undefined; // undefined = seçilməyib, null = qarışıq, rəqəm = janr id
 
+// Telegram Mini App kimi açılıbsa (bot içindən), açılan pəncərəni genişləndir
+// və istifadəçini tanı ki, sifariş birbaşa onun Telegram hesabına bağlansın.
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+}
+function getTelegramUserId() {
+  try {
+    return (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function loadWeek() {
   const genresRoot = document.getElementById("genresRoot");
   const weekLabelEl = document.getElementById("weekLabel");
@@ -150,7 +165,7 @@ async function handleOrder(duration) {
     const res = await fetch("/api/public-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ genreId: selectedGenreId, duration }),
+      body: JSON.stringify({ genreId: selectedGenreId, duration, telegramUserId: getTelegramUserId() }),
     });
     const data = await res.json();
 

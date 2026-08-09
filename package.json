@@ -9,11 +9,13 @@
   "dependencies": {
     "grammy": "^1.30.0",
     "@supabase/supabase-js": "^2.45.4",
-    "openai": "^4.60.0"
+    "openai": "^4.60.0",
+    "nodemailer": "^6.9.15"
   },
   "devDependencies": {
     "@vercel/node": "^3.2.24",
     "typescript": "^5.5.4",
-    "@types/node": "^20.14.15"
+    "@types/node": "^20.14.15",
+    "@types/nodemailer": "^6.4.16"
   }
 }

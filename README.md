@@ -41,7 +41,19 @@ Admin bütün idarəetməni Telegram bot daxilindəki əmrlərlə edir.
 `platform.openai.com`-dan API key al → `OPENAI_API_KEY`.
 Bu addımı keçsən belə bot işləyəcək, sadəcə admin "ai" seçimindən istifadə edə bilməyəcək.
 
-## 5. Vercel-ə deploy
+## 5. Email (qəbz + tövsiyələr göndərmək üçün)
+
+Ödəniş təsdiqlənəndə istifadəçinin email-inə avtomatik qəbz + film siyahısı göndərilir.
+Bunun üçün Gmail App Password istifadə edə bilərsən:
+
+1. Gmail hesabında 2 addımlı təsdiqi aktivləşdir (myaccount.google.com/security)
+2. myaccount.google.com/apppasswords səhifəsinə keç, "MitoFilm" adlı yeni App Password yarat
+3. 16 simvollu kodu götür → bu sənin `SMTP_PASS` dəyərindir
+4. `SMTP_USER` = sənin Gmail ünvanın, `SMTP_HOST` = smtp.gmail.com, `SMTP_PORT` = 587
+
+Bu addımı keçsən belə sistem işləyəcək, sadəcə email göndərilməyəcək.
+
+## 6. Vercel-ə deploy
 
 ```bash
 npm install -g vercel
@@ -64,7 +76,7 @@ Sonra yenidən deploy et ki, dəyişənlər aktiv olsun:
 vercel --prod
 ```
 
-## 6. Webhook-u aktivləşdirmək
+## 7. Webhook-u aktivləşdirmək
 
 Brauzerdə bunu aç (bir dəfə kifayətdir):
 
@@ -74,11 +86,24 @@ https://SİZİN-DOMAIN.vercel.app/api/set-webhook
 
 `{"ok":true,...}` cavabı gəlsə, bot artıq mesajları qəbul edir.
 
-## 7. Botdan istifadə
+## 8. "Yeni tövsiyə al" sabit düyməsini aktivləşdirmək
+
+Bu, botun söhbət pəncərəsinin sol-alt küncündə HƏMİŞƏ görünən düymədir və basılanda
+sayt Telegram-ın öz daxilində (Mini App kimi, böyüdülə bilən) açılır. Brauzerdə bir dəfə aç:
+
+```
+https://SİZİN-DOMAIN.vercel.app/api/set-menu-button
+```
+
+`{"ok":true,...}` cavabı gəlsə, hazırdır — Telegram-a qayıdıb bot söhbətinin sol-alt
+küncünə bax, "Yeni tövsiyə al" yazısını görməlisən.
+
+## 9. Botdan istifadə
 
 **İstifadəçi tərəfi:**
-- `/start` — əsas menyu
-- Janra görə seç və ya Qarışıq seç → Ödə → ödəniş linki → ödəniş bitəndə filmlər avtomatik gəlir
+- `/start` — ilk dəfə yazanda bot ad, telefon (paylaş düyməsi ilə) və email soruşur, sonra əsas menyu açılır
+- Söhbətin sol-alt küncündəki **"Yeni tövsiyə al"** düyməsi → sayt Telegram daxilində (Mini App kimi) açılır, janr + plan seçib ödəniş edilir
+- Əsas menyudakı köhnə mətn-əsaslı axın (Janra görə seç / Qarışıq) da paralel işləyir
 - `/mysubs` — abunəliklərin
 - `/help` — kömək
 
@@ -90,7 +115,9 @@ https://SİZİN-DOMAIN.vercel.app/api/set-webhook
   treyler, rəsmi izləmə linki) → Yadda saxla
 - **Bu həftənin filmləri** → siyahını göstərir
 - **Həftəni yayımla** → yalnız yayımlandıqdan sonra istifadəçilər ödəniş edib filmlərə çata bilir
-- **Qiymətləri dəyiş** → janr üzrə və qarışıq üçün qiymət
+- **Bot qiymətləri** → botun öz (köhnə, həftəlik) qiymətləri
+- **Sayt qiymətləri** → saytdakı 1 günlük/7 günlük/1 aylıq planların qiymətləri (janr və qarışıq üçün ayrı-ayrı)
+
 
 ## Layihə strukturu
 
@@ -128,9 +155,10 @@ Bu, Telegram botundan TAM ASILI DEYİL — istifadəçi birbaşa saytda bilet se
 
 Bu planların qiymətlərini Telegram-da `/admin` > "🌐 Sayt qiymətləri" ilə dəyişə bilərsən (bot özü isə ayrıca, sadə həftəlik qiymətlərlə işləyir — "💰 Bot qiymətləri").
 
-**Vacib:** bu funksiya üçün aşağıdakı 2 migration faylını da Supabase SQL Editor-da (schema.sql-dan sonra) sırayla işə salmaq lazımdır:
+**Vacib:** bu funksiya üçün aşağıdakı 3 migration faylını da Supabase SQL Editor-da (schema.sql-dan sonra) sırayla işə salmaq lazımdır:
 1. `db/migration_web.sql` — Telegram-sız (veb) sifarişlərə icazə verir
 2. `db/migration_plans.sql` — müddətli planlar (1 günlük/7 günlük/1 aylıq) üçün lazımi sütun və qiymətlər
+3. `db/migration_contact.sql` — istifadəçi məlumatları (ad/telefon/email) və onboarding üçün
 
 Sayt eyni Vercel layihəsində, `/` ünvanında avtomatik görünür (əlavə deploy addımı lazım deyil).
 

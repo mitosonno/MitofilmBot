@@ -119,3 +119,27 @@ export async function setAdminSession(adminId: number, state: any) {
 export async function clearAdminSession(adminId: number) {
   await supabase.from("admin_sessions").delete().eq("admin_id", adminId);
 }
+
+export async function getUser(id: number) {
+  const { data } = await supabase.from("users").select("*").eq("id", id).maybeSingle();
+  return data;
+}
+
+export async function getUserSession(userId: number): Promise<any> {
+  const { data } = await supabase
+    .from("user_sessions")
+    .select("state")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data?.state ?? null;
+}
+
+export async function setUserSession(userId: number, state: any) {
+  await supabase
+    .from("user_sessions")
+    .upsert({ user_id: userId, state, updated_at: new Date().toISOString() });
+}
+
+export async function clearUserSession(userId: number) {
+  await supabase.from("user_sessions").delete().eq("user_id", userId);
+}

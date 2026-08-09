@@ -1,10 +1,14 @@
-import { Bot, InlineKeyboard } from "grammy";
+import { Bot, InlineKeyboard, Keyboard } from "grammy";
 import {
   getGenres,
   getLatestPublishedWeek,
   upsertUser,
   getSetting,
   supabase,
+  getUser,
+  getUserSession,
+  setUserSession,
+  clearUserSession,
 } from "./supabase";
 import { T } from "./texts";
 import { createPayriffOrder } from "./payriff";
@@ -26,7 +30,63 @@ export function getBot(): Bot {
       first_name: ctx.from.first_name,
     });
     await ctx.reply(T.welcome(ctx.from.first_name || ""));
+
+    const user = await getUser(ctx.from.id);
+    if (!user?.phone || !user?.email) {
+      await setUserSession(ctx.from.id, { step: "name" });
+      await ctx.reply(T.onboardingAskName);
+      return;
+    }
+
     await sendMainMenu(ctx);
+  });
+
+  bot.on("message:contact", async (ctx) => {
+    if (!ctx.from || !ctx.message.contact) return;
+    const session = await getUserSession(ctx.from.id);
+    if (!session || session.step !== "phone") return;
+
+    await supabase
+      .from("users")
+      .update({ phone: ctx.message.contact.phone_number })
+      .eq("id", ctx.from.id);
+
+    session.step = "email";
+    await setUserSession(ctx.from.id, session);
+    await ctx.reply(T.onboardingAskEmail, { reply_markup: { remove_keyboard: true } });
+  });
+
+  // Onboarding (ad → telefon → email) — admin-in mətn axınından ƏVVƏL yoxlanılır,
+  // aktiv onboarding sessiyası yoxdursa `next()` ilə növbəti handler-lərə ötürülür.
+  bot.on("message:text", async (ctx, next) => {
+    if (!ctx.from) return next();
+    const session = await getUserSession(ctx.from.id);
+    if (!session) return next();
+
+    const text = ctx.message.text.trim();
+
+    if (session.step === "name") {
+      await supabase.from("users").update({ full_name: text }).eq("id", ctx.from.id);
+      session.step = "phone";
+      await setUserSession(ctx.from.id, session);
+      const kb = new Keyboard().requestContact(T.onboardingSharePhoneBtn).resized().oneTime();
+      await ctx.reply(T.onboardingAskPhone, { reply_markup: kb });
+      return;
+    }
+
+    if (session.step === "email") {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) {
+        await ctx.reply(T.onboardingInvalidEmail);
+        return;
+      }
+      await supabase.from("users").update({ email: text }).eq("id", ctx.from.id);
+      await clearUserSession(ctx.from.id);
+      await ctx.reply(T.onboardingDone(ctx.from.first_name || ""));
+      await sendMainMenu(ctx);
+      return;
+    }
+
+    return next();
   });
 
   bot.command("help", async (ctx) => ctx.reply(T.help));
@@ -149,7 +209,10 @@ export function getBot(): Bot {
 }
 
 async function sendMainMenu(ctx: any) {
-  const kb = new InlineKeyboard()
+  const base = process.env.PUBLIC_BASE_URL || "";
+  const kb = new InlineKeyboard();
+  if (base) kb.webApp(T.menuOpenSite, base).row();
+  kb
     .text(T.btnByGenre, "menu:by_genre")
     .row()
     .text(T.btnMixed, "menu:mixed")

@@ -140,4 +140,13 @@ export const T = {
   adminAskSitePriceMixedMonth: "Sayt — Qarışıq, 1 aylıq qiymət (AZN, məs: 12.00):",
 
   genericError: "Nəsə səhv getdi, bir az sonra yenidən cəhd et 🙏",
+
+  menuOpenSite: "🎬 Tövsiyələrə bax",
+
+  onboardingAskName: "Əvvəlcə tanış olaq — adını necə yazaq?",
+  onboardingAskPhone: "Çox gözəl! İndi telefon nömrəni aşağıdakı düymə ilə paylaş:",
+  onboardingSharePhoneBtn: "📱 Nömrəni paylaş",
+  onboardingAskEmail: "Son sual — email ünvanın nədir? (ödəniş qəbzin və tövsiyələrin bura da göndəriləcək)",
+  onboardingInvalidEmail: "Bu email düzgün görünmür, bir də yaz:",
+  onboardingDone: (name: string) => `Çox sağ ol, ${name}! İndi hazırsan 🎬`,
 };

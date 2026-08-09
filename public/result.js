@@ -2,6 +2,11 @@ function getParam(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
+if (window.Telegram && window.Telegram.WebApp) {
+  window.Telegram.WebApp.ready();
+  window.Telegram.WebApp.expand();
+}
+
 function escapeHtml(s) {
   const div = document.createElement("div");
   div.textContent = s || "";

@@ -14,6 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const duration: "day" | "week" | "month" = ["day", "week", "month"].includes(body.duration)
       ? body.duration
       : "week";
+    const telegramUserId: number | null = body.telegramUserId ? Number(body.telegramUserId) : null;
 
     const week = await getLatestPublishedWeek();
     if (!week) {
@@ -26,17 +27,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const amount = parseFloat(priceStr);
     const currency = (await getSetting("currency")) || "AZN";
 
+    // Mini App daxilindən gələn sifarişlər üçün Telegram istifadəçisini tanıyırıq —
+    // beləliklə nəticə həm saytda, həm də Telegram-da (və email-də, əgər varsa) çatır.
+    if (telegramUserId) {
+      await supabase.from("users").upsert({ id: telegramUserId });
+    }
+
     const { data: sub, error } = await supabase
       .from("subscriptions")
       .insert({
-        user_id: null,
+        user_id: telegramUserId,
         week_id: week.id,
         genre_id: genreId,
         duration,
         status: "pending",
         amount,
         currency,
-        source: "web",
+        source: telegramUserId ? "miniapp" : "web",
       })
       .select()
       .single();
