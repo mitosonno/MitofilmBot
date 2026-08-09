@@ -22,6 +22,15 @@ if (tgUid) {
   const link = document.getElementById("historyLink");
   link.href = `/history.html?tg=${tgUid}`;
   link.style.display = "inline-block";
+
+  // Admin olub-olmadığını yoxla (server tərəfində Telegram initData təsdiqlənir)
+  if (tg && tg.initData) {
+    fetch("/api/admin-state", { headers: { "X-Telegram-Init-Data": tg.initData } })
+      .then((r) => {
+        if (r.ok) document.getElementById("adminLink").style.display = "inline-block";
+      })
+      .catch(() => {});
+  }
 }
 
 async function loadWeek() {

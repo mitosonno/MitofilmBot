@@ -108,15 +108,9 @@ küncünə bax, "Yeni tövsiyə al" yazısını görməlisən.
 - `/help` — kömək
 
 **Admin tərəfi** (yalnız `ADMIN_TELEGRAM_IDS`-də olan id-lər üçün):
-- `/admin` — admin panel açılır
-- **Yeni həftə yarat** → həftənin adını yaz (məs: "10-16 Avqust")
-- **Film əlavə et** → janr seç, sonra bot ardıcıl suallar verir (ad, poster linki, il,
-  IMDb, ölkə, rejissor, aktyorlar, müddət, təsvir, rəy — "ai" yazsan OpenAI qaralama yazır —
-  treyler, rəsmi izləmə linki) → Yadda saxla
-- **Bu həftənin filmləri** → siyahını göstərir
-- **Həftəni yayımla** → yalnız yayımlandıqdan sonra istifadəçilər ödəniş edib filmlərə çata bilir
-- **Bot qiymətləri** → botun öz (köhnə, həftəlik) qiymətləri
-- **Sayt qiymətləri** → saytdakı 1 günlük/7 günlük/1 aylıq planların qiymətləri (janr və qarışıq üçün ayrı-ayrı)
+- `/admin` yazanda bot birbaşa **Mini App-ın admin panelini** açan düymə göndərir — bütün idarəetmə (həftə yaratmaq, film əlavə/redaktə/silmək, yayımlamaq, qiymətləri dəyişmək) həmin panel daxilində, formalarla edilir
+- Admin panel yalnız Telegram-ın rəsmi doğrulama alqoritmi ilə təsdiqlənən, `ADMIN_TELEGRAM_IDS`-də olan istifadəçilər üçün açılır — başqası cəhd etsə "Bu bölmə yalnız admin üçündür" görür
+- Botun köhnə mətn-əsaslı admin axını (`/admin` → düymələrlə sual-cavab) da kodda saxlanılıb, ehtiyac olarsa geri qaytarıla bilər
 
 
 ## Layihə strukturu
@@ -162,6 +156,8 @@ Bu planların qiymətlərini Telegram-da `/admin` > "🌐 Sayt qiymətləri" il�
 4. `db/migration_schedule.sql` — hər film üçün tövsiyə olunan gün/saat üçün
 
 Sayt eyni Vercel layihəsində, `/` ünvanında avtomatik görünür (əlavə deploy addımı lazım deyil). Telegram Mini App daxilində açılanda (bot düyməsi ilə) istifadəçi avtomatik tanınır, sifariş onun Telegram hesabına bağlanır, və `/history.html` səhifəsindən keçmiş tövsiyələrinə baxa bilir.
+
+**Admin panel (`/admin.html`):** tam funksional idarəetmə paneli — həftə yaratmaq, film əlavə/redaktə/silmək (poster, IMDb, gün/saat və s. daxil), yayımlamaq, bütün qiymətləri dəyişmək. Yalnız Telegram-ın rəsmi `initData` doğrulaması ilə təsdiqlənən admin id-lər daxil ola bilir (bax: `lib/telegramAuth.ts`).
 
 ## Növbəti addımlar (istəyə görə genişlənə bilər)
 

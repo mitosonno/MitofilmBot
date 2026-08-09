@@ -65,7 +65,9 @@ export async function registerAdminHandlers(bot: Bot) {
     const id = ctx.from?.id;
     if (!id || !isAdmin(id)) return ctx.reply(T.notAdmin);
     await clearAdminSession(id);
-    await ctx.reply(T.adminMenu, { reply_markup: adminMenuKeyboard() });
+    const base = process.env.PUBLIC_BASE_URL || "";
+    const kb = new InlineKeyboard().webApp("🛠 Admin panelini aç", `${base}/admin.html`);
+    await ctx.reply("Admin panelini Mini App daxilində aç:", { reply_markup: kb });
   });
 
   bot.callbackQuery("admin:new_week", async (ctx) => {

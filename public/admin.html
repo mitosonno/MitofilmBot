@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MitoFilm — Admin</title>
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  .admin-wrap { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; }
+  .admin-head { text-align: center; margin-bottom: 32px; }
+  .gate { text-align: center; padding: 60px 24px; color: var(--muted); }
+  .form-form .modal-body { padding: 20px 24px 4px; }
+  .movie-thumb-fallback { width:36px;height:52px;border-radius:4px;background:var(--surface-2);display:inline-block; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="brand">Mito<span>Film</span></a>
+</nav>
+
+<div class="admin-wrap">
+  <div class="admin-head">
+    <span class="eyebrow">Admin</span>
+    <h2>İdarəetmə paneli</h2>
+  </div>
+
+  <div id="gate" class="gate">Yoxlanılır...</div>
+  <div id="adminRoot" style="display:none"></div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-sheet" id="modalSheet"></div>
+</div>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/admin.js"></script>
+</body>
+</html>
