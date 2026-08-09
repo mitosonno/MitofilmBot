@@ -132,7 +132,7 @@ function closeModal() {
 
 async function poll(orderId, attempt = 0) {
   try {
-    const res = await fetch(`/api/public-order-status?id=${encodeURIComponent(orderId)}`);
+    const res = await fetch(`/api/public-order?id=${encodeURIComponent(orderId)}`);
     const data = await res.json();
 
     if (data.status === "paid") {

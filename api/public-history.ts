@@ -10,7 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data: subs } = await supabase
     .from("subscriptions")
-    .select("id, genre_id, duration, status, amount, currency, created_at, paid_at, genres(name_az)")
+    .select("id, status, amount, currency, paid_at, plans(title, genre_id, genres(name_az))")
     .eq("user_id", telegramUserId)
     .eq("status", "paid")
     .order("paid_at", { ascending: false })
@@ -19,8 +19,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.status(200).json({
     orders: (subs || []).map((s: any) => ({
       id: s.id,
-      label: s.genre_id ? s.genres?.name_az || "Janr" : "Qarışıq",
-      duration: s.duration,
+      label: s.plans?.genre_id ? s.plans?.genres?.name_az || "Janr" : "Qarışıq",
+      planTitle: s.plans?.title || "",
       amount: s.amount,
       currency: s.currency,
       paidAt: s.paid_at,

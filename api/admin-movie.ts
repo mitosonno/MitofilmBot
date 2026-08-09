@@ -4,7 +4,6 @@ import { supabase } from "../lib/supabase";
 
 function movieFields(b: any) {
   return {
-    genre_id: b.genre_id,
     title: b.title,
     original_title: b.original_title || null,
     poster_url: b.poster_url,
@@ -31,15 +30,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  if (req.method === "GET") {
+    const planId = req.query.plan_id as string;
+    if (!planId) {
+      res.status(400).json({ error: "plan_id yoxdur" });
+      return;
+    }
+    const { data } = await supabase
+      .from("plan_movies")
+      .select("*")
+      .eq("plan_id", planId)
+      .order("created_at", { ascending: true });
+    res.status(200).json({ movies: data || [] });
+    return;
+  }
+
   if (req.method === "POST") {
     const b = req.body || {};
-    if (!b.week_id || !b.genre_id || !b.title || !b.poster_url || !b.official_watch_url) {
+    if (!b.plan_id || !b.title || !b.poster_url || !b.official_watch_url) {
       res.status(400).json({ error: "Bütün məcburi sahələri doldur." });
       return;
     }
     const { data, error } = await supabase
-      .from("movies")
-      .insert({ week_id: b.week_id, ...movieFields(b) })
+      .from("plan_movies")
+      .insert({ plan_id: b.plan_id, ...movieFields(b) })
       .select()
       .single();
     if (error) {
@@ -58,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const b = req.body || {};
     const { data, error } = await supabase
-      .from("movies")
+      .from("plan_movies")
       .update(movieFields(b))
       .eq("id", id)
       .select()
@@ -77,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ error: "id yoxdur" });
       return;
     }
-    const { error } = await supabase.from("movies").delete().eq("id", id);
+    const { error } = await supabase.from("plan_movies").delete().eq("id", id);
     if (error) {
       res.status(500).json({ error: error.message });
       return;

@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { T } from "./texts";
-import { getMoviesForOrder } from "./movies";
+import { getMoviesForOrder, getMoviesForPlan } from "./movies";
 import { sendReceiptEmail } from "./email";
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
@@ -48,12 +48,14 @@ export async function deliverMoviesForSubscription(subscriptionId: string) {
     .update({ status: "paid", paid_at: new Date().toISOString() })
     .eq("id", subscriptionId);
 
-  const { label, movies } = await getMoviesForOrder({
-    genre_id: sub.genre_id,
-    duration: sub.duration || "week",
-  });
-
-  const planLabel = `${label} — ${durationLabel(sub.duration || "week")}`;
+  const { label, movies, planLabel } = await (async () => {
+    if (sub.plan_id) {
+      const r = await getMoviesForPlan(sub.plan_id);
+      return { label: r.label, movies: r.movies, planLabel: `${r.label} — ${r.planTitle}` };
+    }
+    const r = await getMoviesForOrder({ genre_id: sub.genre_id, duration: sub.duration || "week" });
+    return { label: r.label, movies: r.movies, planLabel: `${r.label} — ${durationLabel(sub.duration || "week")}` };
+  })();
 
   if (sub.user_id) {
     const { data: user } = await supabase

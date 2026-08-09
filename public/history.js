@@ -13,10 +13,6 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
-function durationLabel(d) {
-  return d === "day" ? "1 günlük" : d === "month" ? "1 aylıq" : "7 günlük";
-}
-
 function formatDate(iso) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -51,7 +47,7 @@ async function loadHistory() {
             (o) => `
           <a href="/result.html?order=${encodeURIComponent(o.id)}" class="hist-item">
             <div class="left">
-              <h3>${escapeHtml(o.label)} — ${durationLabel(o.duration)}</h3>
+              <h3>${escapeHtml(o.label)} — ${escapeHtml(o.planTitle)}</h3>
               <span>${formatDate(o.paidAt)}</span>
             </div>
             <div class="right">${o.amount} ${escapeHtml(o.currency)}</div>

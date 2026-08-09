@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireAdminFromInitData } from "../lib/telegramAuth";
-import { supabase, getGenres, getDraftWeek, getSetting } from "../lib/supabase";
+import { supabase, getGenres, getAllAdminPlans, getSetting } from "../lib/supabase";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const initData = req.headers["x-telegram-init-data"] as string | undefined;
@@ -10,61 +10,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const [
-    week,
-    genres,
-    priceGenreDay,
-    priceGenreWeek,
-    priceGenreMonth,
-    priceMixedDay,
-    priceMixedWeek,
-    priceMixedMonth,
-    botPriceGenre,
-    botPriceMixed,
-    currency,
-  ] = await Promise.all([
-    getDraftWeek(),
+  const [genres, plans, botPriceGenre, botPriceMixed] = await Promise.all([
     getGenres(),
-    getSetting("price_genre_day"),
-    getSetting("price_genre_week"),
-    getSetting("price_genre_month"),
-    getSetting("price_mixed_day"),
-    getSetting("price_mixed_week"),
-    getSetting("price_mixed_month"),
+    getAllAdminPlans(),
     getSetting("price_genre"),
     getSetting("price_mixed"),
-    getSetting("currency"),
   ]);
 
-  let movies: any[] = [];
-  if (week) {
-    const { data } = await supabase
-      .from("movies")
-      .select("*, genres(name_az)")
-      .eq("week_id", week.id)
-      .order("created_at", { ascending: true });
-    movies = data || [];
+  const planIds = plans.map((p: any) => p.id);
+  let counts: Record<string, number> = {};
+  if (planIds.length > 0) {
+    const { data: movieRows } = await supabase.from("plan_movies").select("plan_id").in("plan_id", planIds);
+    (movieRows || []).forEach((m: any) => {
+      counts[m.plan_id] = (counts[m.plan_id] || 0) + 1;
+    });
   }
 
-  const { data: publishedWeeks } = await supabase
-    .from("weeks")
-    .select("id, week_label, published_at")
-    .eq("status", "published")
-    .order("published_at", { ascending: false })
-    .limit(8);
-
   res.status(200).json({
-    week,
-    movies,
     genres,
-    publishedWeeks: publishedWeeks || [],
-    prices: {
-      site: {
-        genre: { day: priceGenreDay, week: priceGenreWeek, month: priceGenreMonth },
-        mixed: { day: priceMixedDay, week: priceMixedWeek, month: priceMixedMonth },
-      },
-      bot: { genre: botPriceGenre, mixed: botPriceMixed },
-      currency: currency || "AZN",
-    },
+    plans: plans.map((p: any) => ({
+      id: p.id,
+      genre_id: p.genre_id,
+      genreName: p.genre_id ? p.genres?.name_az : "Qarışıq",
+      title: p.title,
+      price: p.price,
+      currency: p.currency,
+      status: p.status,
+      movieCount: counts[p.id] || 0,
+    })),
+    botPrices: { genre: botPriceGenre || "3.00", mixed: botPriceMixed || "5.00" },
   });
 }

@@ -81,7 +81,7 @@ vercel --prod
 Brauzerdə bunu aç (bir dəfə kifayətdir):
 
 ```
-https://SİZİN-DOMAIN.vercel.app/api/set-webhook
+https://SİZİN-DOMAIN.vercel.app/api/setup
 ```
 
 `{"ok":true,...}` cavabı gəlsə, bot artıq mesajları qəbul edir.
@@ -92,7 +92,7 @@ Bu, botun söhbət pəncərəsinin sol-alt küncündə HƏMİŞƏ görünən dü
 sayt Telegram-ın öz daxilində (Mini App kimi, böyüdülə bilən) açılır. Brauzerdə bir dəfə aç:
 
 ```
-https://SİZİN-DOMAIN.vercel.app/api/set-menu-button
+https://SİZİN-DOMAIN.vercel.app/api/setup?action=menu-button
 ```
 
 `{"ok":true,...}` cavabı gəlsə, hazırdır — Telegram-a qayıdıb bot söhbətinin sol-alt
@@ -118,9 +118,15 @@ küncünə bax, "Yeni tövsiyə al" yazısını görməlisən.
 ```
 mitofilm-bot/
   api/
-    webhook.ts            → Telegram-dan gələn bütün mesajlar
-    payriff-callback.ts   → Payriff ödəniş təsdiqi
-    set-webhook.ts        → webhook qeydiyyatı (bir dəfəlik)
+    webhook.ts             → Telegram-dan gələn bütün mesajlar
+    payriff-callback.ts    → Payriff ödəniş təsdiqi
+    setup.ts                → webhook + menu-button qeydiyyatı (bir dəfəlik)
+    public-week.ts            → sayt: cari həftə, janrlar, qiymətlər
+    public-order.ts            → sayt: sifariş yaratmaq (POST) və statusu yoxlamaq (GET)
+    public-history.ts           → sayt: Mini App istifadəçisinin sifariş tarixçəsi
+    admin-state.ts                → admin: cari vəziyyət (həftə, filmlər, qiymətlər)
+    admin-movie.ts                 → admin: film əlavə/redaktə/silmə
+    admin-actions.ts                → admin: yeni həftə, yayımla, qiymətləri yenilə
   lib/
     bot.ts                → istifadəçi axını (menyu, janr seçimi, ödəniş)
     admin.ts               → admin paneli və film əlavə etmə axını
@@ -149,15 +155,28 @@ Bu, Telegram botundan TAM ASILI DEYİL — istifadəçi birbaşa saytda bilet se
 
 Bu planların qiymətlərini Telegram-da `/admin` > "🌐 Sayt qiymətləri" ilə dəyişə bilərsən (bot özü isə ayrıca, sadə həftəlik qiymətlərlə işləyir — "💰 Bot qiymətləri").
 
-**Vacib:** bu funksiya üçün aşağıdakı 4 migration faylını da Supabase SQL Editor-da (schema.sql-dan sonra) sırayla işə salmaq lazımdır:
+**Vacib:** bu funksiya üçün aşağıdakı 5 migration faylını da Supabase SQL Editor-da (schema.sql-dan sonra) sırayla işə salmaq lazımdır:
 1. `db/migration_web.sql` — Telegram-sız (veb) sifarişlərə icazə verir
-2. `db/migration_plans.sql` — müddətli planlar (1 günlük/7 günlük/1 aylıq) üçün lazımi sütun və qiymətlər
+2. `db/migration_plans.sql` — köhnə müddətli planlar üçün (legacy, botun mətn-menyusu üçün saxlanılır)
 3. `db/migration_contact.sql` — istifadəçi məlumatları (ad/telefon/email) və onboarding üçün
 4. `db/migration_schedule.sql` — hər film üçün tövsiyə olunan gün/saat üçün
+5. `db/migration_plans_v2.sql` — **əsas model**: admin-in özünün yaratdığı Tövsiyə Planları + poster şəkilləri üçün fayl anbarı
+
+## Tövsiyə Planları (əsas model)
+
+Sayt və admin panel **Plan** əsasında işləyir:
+
+- Admin `/admin.html`-də janr seçib (və ya "Qarışıq"), plana ad verib (məs: "1 günlük", "7 günlük", "VIP paket" — istənilən ad), qiymət təyin edir → plan yaranır
+- Admin plana filmlər əlavə edir (poster şəkli birbaşa telefon/komputerdən yüklənir, linkə ehtiyac yoxdur) → hazır olanda "Planı yayımla" basır
+- Sayt/Mini App-da istifadəçi janr seçəndə, o janr üçün YAYIMLANMIŞ bütün planlar göstərilir, istifadəçi birini seçib ödəyir
+- Bir janrın istənilən sayda planı ola bilər (məs: "Qorxu — 1 film", "Qorxu — 7 film" paralel mövcud ola bilər)
+- Admin istənilən planı silə və ya "qaralamaya" qaytara bilər
+
+**Qeyd:** Botun köhnə mətn-əsaslı menyusu (Janra görə seç / Qarışıq — inline düymələrlə) hələ də paralel işləyir, amma köhnə "həftə" sisteminə əsaslanır və admin panel indi onu idarə etmir (`/admin` > "Bot qiymətləri" ilə yalnız onun qiymətini dəyişmək olar). Yeni Plan sistemi ilə heç bir ziddiyyəti yoxdur.
 
 Sayt eyni Vercel layihəsində, `/` ünvanında avtomatik görünür (əlavə deploy addımı lazım deyil). Telegram Mini App daxilində açılanda (bot düyməsi ilə) istifadəçi avtomatik tanınır, sifariş onun Telegram hesabına bağlanır, və `/history.html` səhifəsindən keçmiş tövsiyələrinə baxa bilir.
 
-**Admin panel (`/admin.html`):** tam funksional idarəetmə paneli — həftə yaratmaq, film əlavə/redaktə/silmək (poster, IMDb, gün/saat və s. daxil), yayımlamaq, bütün qiymətləri dəyişmək. Yalnız Telegram-ın rəsmi `initData` doğrulaması ilə təsdiqlənən admin id-lər daxil ola bilir (bax: `lib/telegramAuth.ts`).
+**Admin panel (`/admin.html`):** tam funksional idarəetmə paneli — plan yaratmaq, filmlərini idarə etmək (poster yükləmə daxil, gün/saat), yayımlamaq, silmək. Yalnız Telegram-ın rəsmi `initData` doğrulaması ilə təsdiqlənən admin id-lər daxil ola bilir (bax: `lib/telegramAuth.ts`).
 
 ## Növbəti addımlar (istəyə görə genişlənə bilər)
 

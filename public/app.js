@@ -1,8 +1,6 @@
-let STATE = null; // /api/public-week cavabı
+let STATE = null; // /api/public-plans cavabı
 let selectedGenreId = undefined; // undefined = seçilməyib, null = qarışıq, rəqəm = janr id
 
-// Telegram Mini App kimi açılıbsa (bot içindən), açılan pəncərəni genişləndir
-// və istifadəçini tanı ki, sifariş birbaşa onun Telegram hesabına bağlansın.
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) {
   tg.ready();
@@ -16,14 +14,12 @@ function getTelegramUserId() {
   }
 }
 
-// Yalnız Telegram Mini App daxilindəyiksə "Tarixçəm" linkini göstər
 const tgUid = getTelegramUserId();
 if (tgUid) {
   const link = document.getElementById("historyLink");
   link.href = `/history.html?tg=${tgUid}`;
   link.style.display = "inline-block";
 
-  // Admin olub-olmadığını yoxla (server tərəfində Telegram initData təsdiqlənir)
   if (tg && tg.initData) {
     fetch("/api/admin-state", { headers: { "X-Telegram-Init-Data": tg.initData } })
       .then((r) => {
@@ -33,29 +29,28 @@ if (tgUid) {
   }
 }
 
-async function loadWeek() {
+async function loadData() {
   const genresRoot = document.getElementById("genresRoot");
-  const weekLabelEl = document.getElementById("weekLabel");
   const teaserEl = document.getElementById("teaser");
 
   try {
-    const res = await fetch("/api/public-week");
-    const data = await res.json();
-    STATE = data;
+    const res = await fetch("/api/public-plans");
+    STATE = await res.json();
 
-    if (!data.week) {
+    if (!STATE.plans || STATE.plans.length === 0) {
       genresRoot.innerHTML = `
         <div class="empty-state">
-          Hazırda aktiv tövsiyə yoxdur. Tezliklə yeni həftənin filmləri açılacaq 🎬
+          Hazırda aktiv tövsiyə yoxdur. Tezliklə yeni planlar açılacaq 🎬
         </div>`;
       teaserEl.style.display = "none";
+      document.getElementById("weekLabel").style.display = "none";
       return;
     }
 
-    weekLabelEl.textContent = data.week.label;
+    document.getElementById("weekLabel").style.display = "none";
 
-    if (data.teaser && data.teaser.length > 0) {
-      teaserEl.innerHTML = data.teaser
+    if (STATE.teaser && STATE.teaser.length > 0) {
+      teaserEl.innerHTML = STATE.teaser
         .map((m) => `<img src="${escapeAttr(m.poster)}" alt="${escapeAttr(m.title)}" loading="lazy" />`)
         .join("");
     } else {
@@ -71,7 +66,11 @@ async function loadWeek() {
 function renderGenres() {
   const genresRoot = document.getElementById("genresRoot");
 
-  const genreCards = STATE.genres
+  // Yalnız içində ən azı 1 plan olan janrları göstər (+ Qarışıq, əgər varsa)
+  const genresWithPlans = STATE.genres.filter((g) => STATE.plans.some((p) => p.genre_id === g.id));
+  const hasMixed = STATE.plans.some((p) => p.genre_id === null);
+
+  const genreCards = genresWithPlans
     .map(
       (g) => `
     <div class="ticket genre-card" data-genre-id="${g.id}">
@@ -88,7 +87,8 @@ function renderGenres() {
     )
     .join("");
 
-  const mixedCard = `
+  const mixedCard = hasMixed
+    ? `
     <div class="ticket featured genre-card" data-genre-id="">
       <div class="ticket-main">
         <span class="ticket-tag">Qarışıq</span>
@@ -99,7 +99,8 @@ function renderGenres() {
         <span class="price">Planlar →</span>
         <button class="btn-select" data-genre-id="">Seç</button>
       </div>
-    </div>`;
+    </div>`
+    : "";
 
   genresRoot.innerHTML = `<div class="tickets">${genreCards}${mixedCard}</div>`;
 
@@ -120,47 +121,35 @@ function selectGenre(genreId) {
     card.classList.toggle("selected", cardGenreId === genreId);
   });
 
-  const genreName =
-    genreId === null
-      ? "Qarışıq"
-      : (STATE.genres.find((g) => g.id === genreId) || {}).name_az || "";
-
+  const genreName = genreId === null ? "Qarışıq" : (STATE.genres.find((g) => g.id === genreId) || {}).name_az || "";
   document.getElementById("planHeading").textContent = `${genreName} üçün planını seç`;
 
-  const priceSet = genreId === null ? STATE.prices.mixed : STATE.prices.genre;
-  const currency = STATE.currency;
+  const plans = STATE.plans.filter((p) => p.genre_id === genreId);
 
-  const plans = [
-    { key: "day", label: "1 günlük", desc: "Həftənin 1 seçilmiş filmi.", price: priceSet.day },
-    { key: "week", label: "7 günlük", desc: "Bu həftənin bütün tövsiyələri (7 film).", price: priceSet.week },
-    { key: "month", label: "1 aylıq", desc: "Son 1 ayın bütün tövsiyələri (~30 film).", price: priceSet.month },
-  ];
-
-  document.getElementById("plansRoot").innerHTML = `
-    <div class="tickets plans">
-      ${plans
-        .map(
-          (p) => `
-        <div class="ticket plan-card ${p.key === "week" ? "featured" : ""}">
-          <div class="ticket-main">
-            <span class="ticket-tag">${p.label}</span>
-            <p>${p.desc}</p>
-          </div>
-          <div class="ticket-stub">
-            <span class="price">${p.price} <small>${currency}</small></span>
-            <button class="btn-select" data-duration="${p.key}">Seç</button>
-          </div>
-        </div>`
-        )
-        .join("")}
-    </div>`;
+  document.getElementById("plansRoot").innerHTML = plans.length
+    ? `<div class="tickets plans">${plans.map(planCardHtml).join("")}</div>`
+    : `<div class="empty-state">Bu janr üçün hələ tövsiyə planı yoxdur.</div>`;
 
   document.querySelectorAll("#plansRoot .btn-select").forEach((btn) => {
-    btn.addEventListener("click", () => handleOrder(btn.getAttribute("data-duration")));
+    btn.addEventListener("click", () => handleOrder(btn.getAttribute("data-plan-id")));
   });
 
   document.getElementById("planSection").style.display = "block";
   document.getElementById("planSection").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function planCardHtml(p) {
+  return `
+    <div class="ticket plan-card">
+      <div class="ticket-main">
+        <span class="ticket-tag">${p.movieCount} film</span>
+        <h3>${escapeHtml(p.title)}</h3>
+      </div>
+      <div class="ticket-stub">
+        <span class="price">${p.price} <small>${escapeHtml(p.currency)}</small></span>
+        <button class="btn-select" data-plan-id="${p.id}">Seç</button>
+      </div>
+    </div>`;
 }
 
 document.getElementById("changeGenre").addEventListener("click", (e) => {
@@ -171,7 +160,7 @@ document.getElementById("changeGenre").addEventListener("click", (e) => {
   document.getElementById("genresRoot").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
-async function handleOrder(duration) {
+async function handleOrder(planId) {
   const msgEl = document.getElementById("orderMsg");
   msgEl.textContent = "";
 
@@ -182,7 +171,7 @@ async function handleOrder(duration) {
     const res = await fetch("/api/public-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ genreId: selectedGenreId, duration, telegramUserId: getTelegramUserId() }),
+      body: JSON.stringify({ planId, telegramUserId: getTelegramUserId() }),
     });
     const data = await res.json();
 
@@ -208,4 +197,4 @@ function escapeAttr(s) {
   return (s || "").replace(/"/g, "&quot;");
 }
 
-loadWeek();
+loadData();

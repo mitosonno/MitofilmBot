@@ -55,3 +55,22 @@ function fallbackLabel(genreId: number | null) {
   return genreId ? "Janr" : "Qarışıq";
 }
 
+// Yeni model: admin-in yaratdığı konkret plana aid filmləri qaytarır.
+export async function getMoviesForPlan(planId: string) {
+  const { data: plan } = await supabase
+    .from("plans")
+    .select("*, genres(name_az)")
+    .eq("id", planId)
+    .maybeSingle();
+
+  const { data: movies } = await supabase
+    .from("plan_movies")
+    .select("*")
+    .eq("plan_id", planId)
+    .order("created_at", { ascending: true });
+
+  const label = plan?.genre_id ? (plan as any).genres?.name_az || "Janr" : "Qarışıq";
+
+  return { label, planTitle: plan?.title || "", movies: movies || [] };
+}
+

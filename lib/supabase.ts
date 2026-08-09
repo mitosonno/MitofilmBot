@@ -9,6 +9,37 @@ export const supabase = createClient(url, key, {
 
 export type Genre = { id: number; name_az: string };
 
+export type Plan = {
+  id: string;
+  genre_id: number | null;
+  title: string;
+  price: number;
+  currency: string;
+  status: "draft" | "published";
+  created_at: string;
+  published_at: string | null;
+};
+
+export type PlanMovie = {
+  id: string;
+  plan_id: string;
+  title: string;
+  original_title: string | null;
+  poster_url: string;
+  release_year: number | null;
+  imdb_rating: number | null;
+  country: string | null;
+  director: string | null;
+  actors: string | null;
+  runtime_minutes: number | null;
+  short_description: string | null;
+  mito_review: string | null;
+  trailer_url: string | null;
+  official_watch_url: string;
+  recommended_day: string | null;
+  recommended_time: string | null;
+};
+
 export type Week = {
   id: string;
   week_label: string;
@@ -144,4 +175,21 @@ export async function setUserSession(userId: number, state: any) {
 
 export async function clearUserSession(userId: number) {
   await supabase.from("user_sessions").delete().eq("user_id", userId);
+}
+
+// --- Planlar ---
+
+export async function getPublishedPlansForGenre(genreId: number | null): Promise<Plan[]> {
+  let q = supabase.from("plans").select("*").eq("status", "published");
+  q = genreId === null ? q.is("genre_id", null) : q.eq("genre_id", genreId);
+  const { data } = await q.order("created_at", { ascending: true });
+  return data || [];
+}
+
+export async function getAllAdminPlans(): Promise<any[]> {
+  const { data } = await supabase
+    .from("plans")
+    .select("*, genres(name_az)")
+    .order("created_at", { ascending: false });
+  return data || [];
 }

@@ -18,33 +18,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const b = req.body || {};
   const action = b.action;
 
-  if (action === "create_week") {
-    if (!b.label || !String(b.label).trim()) {
-      res.status(400).json({ error: "Həftə adı lazımdır." });
+  if (action === "create_plan") {
+    if (!b.title || !String(b.title).trim() || b.price === undefined || b.price === "") {
+      res.status(400).json({ error: "Ad və qiymət lazımdır." });
       return;
     }
+    const genreId = b.genre_id === "" || b.genre_id === null || b.genre_id === undefined ? null : Number(b.genre_id);
     const { data, error } = await supabase
-      .from("weeks")
-      .insert({ week_label: String(b.label).trim(), status: "draft" })
+      .from("plans")
+      .insert({
+        genre_id: genreId,
+        title: String(b.title).trim(),
+        price: parseFloat(b.price),
+        currency: "AZN",
+        status: "draft",
+      })
       .select()
       .single();
     if (error) {
       res.status(500).json({ error: error.message });
       return;
     }
-    res.status(200).json({ week: data });
+    res.status(200).json({ plan: data });
     return;
   }
 
-  if (action === "publish_week") {
-    if (!b.week_id) {
-      res.status(400).json({ error: "week_id yoxdur" });
+  if (action === "update_plan") {
+    if (!b.plan_id) {
+      res.status(400).json({ error: "plan_id yoxdur" });
+      return;
+    }
+    const update: any = {};
+    if (b.title !== undefined) update.title = String(b.title).trim();
+    if (b.price !== undefined && b.price !== "") update.price = parseFloat(b.price);
+    if (b.genre_id !== undefined) {
+      update.genre_id = b.genre_id === "" || b.genre_id === null ? null : Number(b.genre_id);
+    }
+    const { data, error } = await supabase.from("plans").update(update).eq("id", b.plan_id).select().single();
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+    res.status(200).json({ plan: data });
+    return;
+  }
+
+  if (action === "publish_plan") {
+    if (!b.plan_id) {
+      res.status(400).json({ error: "plan_id yoxdur" });
       return;
     }
     const { error } = await supabase
-      .from("weeks")
+      .from("plans")
       .update({ status: "published", published_at: new Date().toISOString() })
-      .eq("id", b.week_id);
+      .eq("id", b.plan_id);
     if (error) {
       res.status(500).json({ error: error.message });
       return;
@@ -53,22 +80,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  if (action === "update_prices") {
-    const entries: [string, any][] = [
-      ["price_genre_day", b.price_genre_day],
-      ["price_genre_week", b.price_genre_week],
-      ["price_genre_month", b.price_genre_month],
-      ["price_mixed_day", b.price_mixed_day],
-      ["price_mixed_week", b.price_mixed_week],
-      ["price_mixed_month", b.price_mixed_month],
-      ["price_genre", b.price_genre],
-      ["price_mixed", b.price_mixed],
-    ];
-    for (const [key, value] of entries) {
-      if (value !== undefined && value !== null && String(value).trim() !== "") {
-        await setSetting(key, String(parseFloat(value).toFixed(2)));
-      }
+  if (action === "unpublish_plan") {
+    if (!b.plan_id) {
+      res.status(400).json({ error: "plan_id yoxdur" });
+      return;
     }
+    const { error } = await supabase.from("plans").update({ status: "draft" }).eq("id", b.plan_id);
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  if (action === "delete_plan") {
+    if (!b.plan_id) {
+      res.status(400).json({ error: "plan_id yoxdur" });
+      return;
+    }
+    const { error } = await supabase.from("plans").delete().eq("id", b.plan_id);
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  // Köhnə (Telegram botun mətn-menyusu üçün) həftəlik qiymətlər — legacy dəstək
+  if (action === "update_bot_prices") {
+    if (b.price_genre) await setSetting("price_genre", String(parseFloat(b.price_genre).toFixed(2)));
+    if (b.price_mixed) await setSetting("price_mixed", String(parseFloat(b.price_mixed).toFixed(2)));
     res.status(200).json({ ok: true });
     return;
   }

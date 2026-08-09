@@ -15,8 +15,11 @@ const DAYS = [
   "Bazar",
 ];
 
-let STATE = null;
+let STATE = null; // { genres, plans, botPrices }
+let currentPlan = null; // hazırda idarə olunan plan (film siyahısı ekranı üçün)
+let currentPlanMovies = [];
 let selectedDay = null;
+let uploadedPosterUrl = "";
 
 function escapeHtml(s) {
   const div = document.createElement("div");
@@ -77,51 +80,176 @@ async function init() {
   }
   gate.style.display = "none";
   document.getElementById("adminRoot").style.display = "block";
-  render();
+  renderHome();
 }
 
-function render() {
+// ============== ANA EKRAN: planların siyahısı + yeni plan formu ==============
+
+function renderHome() {
+  currentPlan = null;
   const root = document.getElementById("adminRoot");
   root.innerHTML = `
     <div class="admin-card">
-      <h2>Cari həftə</h2>
-      ${STATE.week ? weekBoxHtml() : newWeekFormHtml()}
-    </div>
-    ${STATE.week ? moviesCardHtml() : ""}
-    <div class="admin-card">
-      <h2>Sayt qiymətləri (1g / 7g / 1ay)</h2>
-      ${sitePricesFormHtml()}
+      <h2>Yeni tövsiyə planı yarat</h2>
+      ${newPlanFormHtml()}
     </div>
     <div class="admin-card">
-      <h2>Bot qiymətləri (Telegram, həftəlik)</h2>
+      <h2>Planların (${STATE.plans.length})</h2>
+      ${plansListHtml()}
+    </div>
+    <div class="admin-card">
+      <h2>Bot qiymətləri (Telegram-ın köhnə mətn menyusu)</h2>
       ${botPricesFormHtml()}
     </div>
-    ${publishedWeeksHtml()}
   `;
-  wireEvents();
+  wireHomeEvents();
 }
 
-function weekBoxHtml() {
-  return `
-    <p style="margin:0 0 14px;font-weight:700;">${escapeHtml(STATE.week.week_label)}</p>
-    <div class="form-actions">
-      <button id="publishBtn" class="btn btn-gold">📢 Həftəni yayımla (${STATE.movies.length} film)</button>
-    </div>
-    <div class="msg-box" id="weekMsg"></div>`;
-}
-
-function newWeekFormHtml() {
+function newPlanFormHtml() {
+  const genreOptions = STATE.genres.map((g) => `<option value="${g.id}">${escapeHtml(g.name_az)}</option>`).join("");
   return `
     <div class="field">
-      <label>Həftənin adı</label>
-      <input type="text" id="newWeekLabel" placeholder="məs: 10-16 Avqust" />
+      <label>Janr</label>
+      <select id="np_genre">
+        <option value="">Qarışıq (bütün janrlar)</option>
+        ${genreOptions}
+      </select>
     </div>
-    <button id="createWeekBtn" class="btn btn-gold">Yeni həftə yarat</button>
-    <div class="msg-box" id="weekMsg"></div>`;
+    <div class="field">
+      <label>Planın adı</label>
+      <input id="np_title" placeholder="məs: 1 günlük / 7 günlük / 1 aylıq / İstənilən ad" />
+    </div>
+    <div class="field">
+      <label>Qiymət (AZN)</label>
+      <input id="np_price" type="number" step="0.01" placeholder="məs: 3.00" />
+    </div>
+    <button id="createPlanBtn" class="btn btn-gold">+ Plan yarat</button>
+    <div class="msg-box" id="newPlanMsg"></div>`;
 }
 
-function moviesCardHtml() {
-  const rows = STATE.movies
+function plansListHtml() {
+  if (STATE.plans.length === 0) {
+    return `<p style="color:var(--muted);font-size:14px;">Hələ heç bir plan yoxdur. Yuxarıdan birini yarat.</p>`;
+  }
+  return STATE.plans
+    .map(
+      (p) => `
+    <div class="admin-movie-row">
+      <div class="info">
+        <div>
+          <div class="name">${escapeHtml(p.title)} <span style="color:var(--muted);font-weight:500;">— ${escapeHtml(p.genreName)}</span></div>
+          <div class="sub">${p.price} ${escapeHtml(p.currency)} · ${p.movieCount} film · ${p.status === "published" ? "✅ yayımlanıb" : "🕓 qaralama"}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="icon-btn open-plan" data-id="${p.id}">İdarə et</button>
+        <button class="icon-btn del-plan" data-id="${p.id}">Sil</button>
+      </div>
+    </div>`
+    )
+    .join("");
+}
+
+function botPricesFormHtml() {
+  const p = STATE.botPrices;
+  return `
+    <div class="field-row">
+      <div class="field"><label>Janr üzrə</label><input id="p_bot_genre" type="number" step="0.01" value="${escapeAttr(p.genre)}" /></div>
+      <div class="field"><label>Qarışıq</label><input id="p_bot_mixed" type="number" step="0.01" value="${escapeAttr(p.mixed)}" /></div>
+    </div>
+    <button id="saveBotPricesBtn" class="btn btn-gold">Yadda saxla</button>
+    <div class="msg-box" id="botPricesMsg"></div>`;
+}
+
+function wireHomeEvents() {
+  document.getElementById("createPlanBtn").addEventListener("click", createPlan);
+  document.getElementById("saveBotPricesBtn").addEventListener("click", saveBotPrices);
+
+  document.querySelectorAll(".open-plan").forEach((b) =>
+    b.addEventListener("click", () => openPlan(b.getAttribute("data-id")))
+  );
+  document.querySelectorAll(".del-plan").forEach((b) =>
+    b.addEventListener("click", () => deletePlan(b.getAttribute("data-id")))
+  );
+}
+
+async function createPlan() {
+  const msg = document.getElementById("newPlanMsg");
+  const genreVal = document.getElementById("np_genre").value;
+  const title = document.getElementById("np_title").value.trim();
+  const price = document.getElementById("np_price").value;
+
+  if (!title || !price) {
+    msg.textContent = "Ad və qiyməti doldur.";
+    return;
+  }
+
+  try {
+    const data = await api("/api/admin-actions", {
+      method: "POST",
+      body: JSON.stringify({ action: "create_plan", genre_id: genreVal, title, price }),
+    });
+    STATE = await api("/api/admin-state");
+    renderHome();
+    showToast("Plan yaradıldı ✅");
+    openPlan(data.plan.id);
+  } catch (e) {
+    msg.textContent = e.message;
+  }
+}
+
+async function deletePlan(id) {
+  const ok = await confirmDialog("Bu planı və içindəki bütün filmləri silmək istəyirsən?");
+  if (!ok) return;
+  try {
+    await api("/api/admin-actions", { method: "POST", body: JSON.stringify({ action: "delete_plan", plan_id: id }) });
+    STATE = await api("/api/admin-state");
+    renderHome();
+    showToast("Plan silindi");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+async function saveBotPrices() {
+  const msg = document.getElementById("botPricesMsg");
+  try {
+    await api("/api/admin-actions", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "update_bot_prices",
+        price_genre: document.getElementById("p_bot_genre").value,
+        price_mixed: document.getElementById("p_bot_mixed").value,
+      }),
+    });
+    showToast("Qiymətlər yeniləndi ✅");
+  } catch (e) {
+    msg.textContent = e.message;
+  }
+}
+
+// ============== PLAN EKRANI: planın filmləri ==============
+
+async function openPlan(planId) {
+  currentPlan = STATE.plans.find((p) => p.id === planId);
+  if (!currentPlan) return;
+
+  const root = document.getElementById("adminRoot");
+  root.innerHTML = `<div class="admin-card"><p style="color:var(--muted)">Yüklənir...</p></div>`;
+
+  try {
+    const data = await api(`/api/admin-movie?plan_id=${encodeURIComponent(planId)}`);
+    currentPlanMovies = data.movies;
+  } catch (e) {
+    currentPlanMovies = [];
+  }
+
+  renderPlanScreen();
+}
+
+function renderPlanScreen() {
+  const root = document.getElementById("adminRoot");
+  const rows = currentPlanMovies
     .map(
       (m) => `
     <div class="admin-movie-row">
@@ -129,7 +257,7 @@ function moviesCardHtml() {
         ${m.poster_url ? `<img src="${escapeAttr(m.poster_url)}" />` : `<span class="movie-thumb-fallback"></span>`}
         <div>
           <div class="name">${escapeHtml(m.title)}</div>
-          <div class="sub">${escapeHtml((m.genres && m.genres.name_az) || "")}${m.recommended_day ? " · " + escapeHtml(m.recommended_day) : ""}</div>
+          <div class="sub">${m.recommended_day ? escapeHtml(m.recommended_day) + (m.recommended_time ? " · " + escapeHtml(m.recommended_time) : "") : ""}</div>
         </div>
       </div>
       <div style="display:flex;gap:6px;">
@@ -140,111 +268,67 @@ function moviesCardHtml() {
     )
     .join("");
 
-  return `
+  root.innerHTML = `
+    <button class="icon-btn" id="backHomeBtn" style="margin-bottom:16px;">← Bütün planlar</button>
     <div class="admin-card">
-      <h2>Filmlər (${STATE.movies.length})</h2>
+      <h2>${escapeHtml(currentPlan.title)} — ${escapeHtml(currentPlan.genreName)}</h2>
+      <p style="color:var(--muted);font-size:14px;margin-top:-8px;">${currentPlan.price} ${escapeHtml(currentPlan.currency)} · ${currentPlan.status === "published" ? "✅ yayımlanıb" : "🕓 qaralama"}</p>
+      <div class="form-actions">
+        ${
+          currentPlan.status === "published"
+            ? `<button id="unpublishBtn" class="btn btn-ghost">Qaralamaya qaytar</button>`
+            : `<button id="publishBtn" class="btn btn-gold">📢 Planı yayımla</button>`
+        }
+      </div>
+      <div class="msg-box" id="planMsg"></div>
+    </div>
+    <div class="admin-card">
+      <h2>Filmlər (${currentPlanMovies.length})</h2>
       ${rows || '<p style="color:var(--muted);font-size:14px;">Hələ film yoxdur.</p>'}
       <div class="form-actions">
         <button id="addMovieBtn" class="btn btn-gold">+ Film əlavə et</button>
       </div>
-    </div>`;
-}
-
-function sitePricesFormHtml() {
-  const p = STATE.prices.site;
-  return `
-    <div class="field-row">
-      <div class="field"><label>Janr — 1 günlük</label><input id="p_genre_day" type="number" step="0.01" value="${escapeAttr(p.genre.day)}" /></div>
-      <div class="field"><label>Janr — 7 günlük</label><input id="p_genre_week" type="number" step="0.01" value="${escapeAttr(p.genre.week)}" /></div>
     </div>
-    <div class="field-row">
-      <div class="field"><label>Janr — 1 aylıq</label><input id="p_genre_month" type="number" step="0.01" value="${escapeAttr(p.genre.month)}" /></div>
-      <div class="field"><label>Qarışıq — 1 günlük</label><input id="p_mixed_day" type="number" step="0.01" value="${escapeAttr(p.mixed.day)}" /></div>
-    </div>
-    <div class="field-row">
-      <div class="field"><label>Qarışıq — 7 günlük</label><input id="p_mixed_week" type="number" step="0.01" value="${escapeAttr(p.mixed.week)}" /></div>
-      <div class="field"><label>Qarışıq — 1 aylıq</label><input id="p_mixed_month" type="number" step="0.01" value="${escapeAttr(p.mixed.month)}" /></div>
-    </div>
-    <button id="saveSitePricesBtn" class="btn btn-gold">Yadda saxla</button>
-    <div class="msg-box" id="sitePricesMsg"></div>`;
-}
+  `;
 
-function botPricesFormHtml() {
-  const p = STATE.prices.bot;
-  return `
-    <div class="field-row">
-      <div class="field"><label>Janr üzrə</label><input id="p_bot_genre" type="number" step="0.01" value="${escapeAttr(p.genre)}" /></div>
-      <div class="field"><label>Qarışıq</label><input id="p_bot_mixed" type="number" step="0.01" value="${escapeAttr(p.mixed)}" /></div>
-    </div>
-    <button id="saveBotPricesBtn" class="btn btn-gold">Yadda saxla</button>
-    <div class="msg-box" id="botPricesMsg"></div>`;
-}
+  document.getElementById("backHomeBtn").addEventListener("click", async () => {
+    STATE = await api("/api/admin-state");
+    renderHome();
+  });
 
-function publishedWeeksHtml() {
-  if (!STATE.publishedWeeks || STATE.publishedWeeks.length === 0) return "";
-  const rows = STATE.publishedWeeks
-    .map((w) => `<div style="padding:6px 0;color:var(--muted);font-size:13px;">${escapeHtml(w.week_label)}</div>`)
-    .join("");
-  return `<div class="admin-card"><h2>Son yayımlanan həftələr</h2>${rows}</div>`;
-}
+  const pubBtn = document.getElementById("publishBtn");
+  if (pubBtn) pubBtn.addEventListener("click", () => togglePublish(true));
+  const unpubBtn = document.getElementById("unpublishBtn");
+  if (unpubBtn) unpubBtn.addEventListener("click", () => togglePublish(false));
 
-function wireEvents() {
-  const createBtn = document.getElementById("createWeekBtn");
-  if (createBtn) createBtn.addEventListener("click", createWeek);
-
-  const publishBtn = document.getElementById("publishBtn");
-  if (publishBtn) publishBtn.addEventListener("click", publishWeek);
-
-  const addBtn = document.getElementById("addMovieBtn");
-  if (addBtn) addBtn.addEventListener("click", () => openMovieModal(null));
-
+  document.getElementById("addMovieBtn").addEventListener("click", () => openMovieModal(null));
   document.querySelectorAll(".edit-movie").forEach((b) =>
     b.addEventListener("click", () => {
-      const id = b.getAttribute("data-id");
-      const movie = STATE.movies.find((m) => m.id === id);
+      const movie = currentPlanMovies.find((m) => m.id === b.getAttribute("data-id"));
       openMovieModal(movie);
     })
   );
   document.querySelectorAll(".del-movie").forEach((b) =>
     b.addEventListener("click", () => deleteMovie(b.getAttribute("data-id")))
   );
-
-  const saveSite = document.getElementById("saveSitePricesBtn");
-  if (saveSite) saveSite.addEventListener("click", saveSitePrices);
-  const saveBot = document.getElementById("saveBotPricesBtn");
-  if (saveBot) saveBot.addEventListener("click", saveBotPrices);
 }
 
-async function createWeek() {
-  const label = document.getElementById("newWeekLabel").value.trim();
-  const msg = document.getElementById("weekMsg");
-  if (!label) {
-    msg.textContent = "Həftənin adını yaz.";
-    return;
-  }
-  try {
-    const data = await api("/api/admin-week", { method: "POST", body: JSON.stringify({ label }) });
-    STATE.week = data.week;
-    STATE.movies = [];
-    render();
-  } catch (e) {
-    msg.textContent = e.message;
-  }
-}
-
-async function publishWeek() {
-  const msg = document.getElementById("weekMsg");
-  if (STATE.movies.length === 0) {
+async function togglePublish(publish) {
+  const msg = document.getElementById("planMsg");
+  if (publish && currentPlanMovies.length === 0) {
     msg.textContent = "Əvvəlcə ən azı 1 film əlavə et.";
     return;
   }
-  const ok = await confirmDialog(`"${STATE.week.week_label}" həftəsini yayımlayım?`);
-  if (!ok) return;
   try {
-    await api("/api/admin-publish", { method: "POST", body: JSON.stringify({ week_id: STATE.week.id }) });
+    await api("/api/admin-actions", {
+      method: "POST",
+      body: JSON.stringify({ action: publish ? "publish_plan" : "unpublish_plan", plan_id: currentPlan.id }),
+    });
+    currentPlan.status = publish ? "published" : "draft";
     STATE = await api("/api/admin-state");
-    render();
-    showToast("Həftə yayımlandı ✅");
+    currentPlan = STATE.plans.find((p) => p.id === currentPlan.id);
+    renderPlanScreen();
+    showToast(publish ? "Plan yayımlandı ✅" : "Qaralamaya qaytarıldı");
   } catch (e) {
     msg.textContent = e.message;
   }
@@ -255,23 +339,59 @@ async function deleteMovie(id) {
   if (!ok) return;
   try {
     await api(`/api/admin-movie?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    STATE.movies = STATE.movies.filter((m) => m.id !== id);
-    render();
+    currentPlanMovies = currentPlanMovies.filter((m) => m.id !== id);
+    renderPlanScreen();
     showToast("Silindi");
   } catch (e) {
     showToast(e.message);
   }
 }
 
+// ============== FİLM FORMASI (modal) — poster yükləmə daxil ==============
+
+function resizeImage(file, maxWidth) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Şəkil oxuna bilmədi"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Şəkil oxuna bilmədi"));
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handlePosterFile(file) {
+  const preview = document.getElementById("posterPreview");
+  preview.textContent = "Yüklənir...";
+  try {
+    const base64 = await resizeImage(file, 700);
+    preview.innerHTML = `<img src="${base64}" style="width:80px;border-radius:6px;" />`;
+    const data = await api("/api/admin-upload", {
+      method: "POST",
+      body: JSON.stringify({ imageBase64: base64, filename: file.name, contentType: "image/jpeg" }),
+    });
+    uploadedPosterUrl = data.url;
+    document.getElementById("f_poster").value = data.url;
+    preview.innerHTML += ` <span style="color:#8fd19e;font-size:12px;">✅ Yükləndi</span>`;
+  } catch (e) {
+    preview.innerHTML = `<span style="color:var(--rose);font-size:12px;">${escapeHtml(e.message)}</span>`;
+  }
+}
+
 function openMovieModal(movie) {
   selectedDay = movie ? movie.recommended_day : null;
-
-  const genreOptions = STATE.genres
-    .map(
-      (g) =>
-        `<option value="${g.id}" ${movie && movie.genre_id === g.id ? "selected" : ""}>${escapeHtml(g.name_az)}</option>`
-    )
-    .join("");
+  uploadedPosterUrl = movie ? movie.poster_url : "";
 
   const dayPills = DAYS.map(
     (d) => `<button type="button" class="day-pill ${d === selectedDay ? "selected" : ""}" data-day="${escapeAttr(d)}">${escapeHtml(d)}</button>`
@@ -281,10 +401,14 @@ function openMovieModal(movie) {
     <button class="modal-close" id="modalCloseBtn">✕</button>
     <div class="modal-body">
       <h3 style="margin-top:0">${movie ? "Filmi redaktə et" : "Yeni film"}</h3>
-      <div class="field"><label>Janr</label><select id="f_genre">${genreOptions}</select></div>
       <div class="field"><label>Ad</label><input id="f_title" value="${movie ? escapeAttr(movie.title) : ""}" /></div>
       <div class="field"><label>Orijinal ad (istəyə bağlı)</label><input id="f_original_title" value="${movie ? escapeAttr(movie.original_title || "") : ""}" /></div>
-      <div class="field"><label>Poster linki</label><input id="f_poster" value="${movie ? escapeAttr(movie.poster_url) : ""}" placeholder="https://..." /></div>
+      <div class="field">
+        <label>Poster</label>
+        <input type="file" id="f_poster_file" accept="image/*" />
+        <div id="posterPreview" style="margin-top:8px;">${movie && movie.poster_url ? `<img src="${escapeAttr(movie.poster_url)}" style="width:80px;border-radius:6px;" />` : ""}</div>
+        <input type="hidden" id="f_poster" value="${movie ? escapeAttr(movie.poster_url) : ""}" />
+      </div>
       <div class="field-row">
         <div class="field"><label>İl</label><input id="f_year" type="number" value="${movie ? movie.release_year || "" : ""}" /></div>
         <div class="field"><label>IMDb reytinqi</label><input id="f_imdb" type="number" step="0.1" value="${movie ? movie.imdb_rating || "" : ""}" /></div>
@@ -311,6 +435,10 @@ function openMovieModal(movie) {
   document.getElementById("modalOverlay").classList.add("open");
   document.getElementById("modalCloseBtn").addEventListener("click", closeModal);
 
+  document.getElementById("f_poster_file").addEventListener("change", (e) => {
+    if (e.target.files && e.target.files[0]) handlePosterFile(e.target.files[0]);
+  });
+
   document.querySelectorAll(".day-pill").forEach((btn) => {
     btn.addEventListener("click", () => {
       selectedDay = btn.getAttribute("data-day");
@@ -328,8 +456,7 @@ function closeModal() {
 async function saveMovie(id) {
   const msg = document.getElementById("movieMsg");
   const payload = {
-    week_id: STATE.week.id,
-    genre_id: Number(document.getElementById("f_genre").value),
+    plan_id: currentPlan.id,
     title: document.getElementById("f_title").value.trim(),
     original_title: document.getElementById("f_original_title").value.trim(),
     poster_url: document.getElementById("f_poster").value.trim(),
@@ -358,47 +485,15 @@ async function saveMovie(id) {
         method: "PUT",
         body: JSON.stringify(payload),
       });
-      const idx = STATE.movies.findIndex((m) => m.id === id);
-      STATE.movies[idx] = { ...STATE.movies[idx], ...data.movie };
+      const idx = currentPlanMovies.findIndex((m) => m.id === id);
+      currentPlanMovies[idx] = data.movie;
     } else {
       const data = await api("/api/admin-movie", { method: "POST", body: JSON.stringify(payload) });
-      STATE.movies.push(data.movie);
+      currentPlanMovies.push(data.movie);
     }
     closeModal();
-    render();
+    renderPlanScreen();
     showToast(id ? "Yeniləndi ✅" : "Əlavə olundu ✅");
-  } catch (e) {
-    msg.textContent = e.message;
-  }
-}
-
-async function saveSitePrices() {
-  const msg = document.getElementById("sitePricesMsg");
-  const payload = {
-    price_genre_day: document.getElementById("p_genre_day").value,
-    price_genre_week: document.getElementById("p_genre_week").value,
-    price_genre_month: document.getElementById("p_genre_month").value,
-    price_mixed_day: document.getElementById("p_mixed_day").value,
-    price_mixed_week: document.getElementById("p_mixed_week").value,
-    price_mixed_month: document.getElementById("p_mixed_month").value,
-  };
-  try {
-    await api("/api/admin-prices", { method: "POST", body: JSON.stringify(payload) });
-    showToast("Qiymətlər yeniləndi ✅");
-  } catch (e) {
-    msg.textContent = e.message;
-  }
-}
-
-async function saveBotPrices() {
-  const msg = document.getElementById("botPricesMsg");
-  const payload = {
-    price_genre: document.getElementById("p_bot_genre").value,
-    price_mixed: document.getElementById("p_bot_mixed").value,
-  };
-  try {
-    await api("/api/admin-prices", { method: "POST", body: JSON.stringify(payload) });
-    showToast("Qiymətlər yeniləndi ✅");
   } catch (e) {
     msg.textContent = e.message;
   }

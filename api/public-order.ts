@@ -1,8 +1,53 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { supabase, getLatestPublishedWeek, getSetting } from "../lib/supabase";
+import { supabase } from "../lib/supabase";
 import { createPayriffOrder } from "../lib/payriff";
+import { getMoviesForPlan } from "../lib/movies";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === "GET") {
+    const id = (req.query.id as string) || "";
+    if (!id) {
+      res.status(400).json({ status: "error", error: "id yoxdur" });
+      return;
+    }
+
+    const { data: sub } = await supabase.from("subscriptions").select("*").eq("id", id).maybeSingle();
+
+    if (!sub) {
+      res.status(200).json({ status: "not_found" });
+      return;
+    }
+    if (sub.status !== "paid") {
+      res.status(200).json({ status: sub.status });
+      return;
+    }
+
+    const { label, planTitle, movies } = await getMoviesForPlan(sub.plan_id);
+
+    res.status(200).json({
+      status: "paid",
+      label,
+      weekLabel: planTitle,
+      movies: movies.map((m: any) => ({
+        title: m.title,
+        year: m.release_year,
+        imdb: m.imdb_rating,
+        country: m.country,
+        director: m.director,
+        actors: m.actors,
+        runtime: m.runtime_minutes,
+        poster: m.poster_url,
+        desc: m.short_description,
+        review: m.mito_review,
+        trailer: m.trailer_url,
+        watch: m.official_watch_url,
+        day: m.recommended_day,
+        time: m.recommended_time,
+      })),
+    });
+    return;
+  }
+
   if (req.method !== "POST") {
     res.status(405).json({ error: "method not allowed" });
     return;
@@ -10,25 +55,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const body = req.body || {};
-    const genreId: number | null = body.genreId ? Number(body.genreId) : null;
-    const duration: "day" | "week" | "month" = ["day", "week", "month"].includes(body.duration)
-      ? body.duration
-      : "week";
+    const planId = body.planId as string;
     const telegramUserId: number | null = body.telegramUserId ? Number(body.telegramUserId) : null;
 
-    const week = await getLatestPublishedWeek();
-    if (!week) {
-      res.status(400).json({ error: "Bu həftə üçün hələ tövsiyə açılmayıb." });
+    if (!planId) {
+      res.status(400).json({ error: "planId yoxdur" });
       return;
     }
 
-    const settingKey = `price_${genreId ? "genre" : "mixed"}_${duration}`;
-    const priceStr = (await getSetting(settingKey)) || "0";
-    const amount = parseFloat(priceStr);
-    const currency = (await getSetting("currency")) || "AZN";
+    const { data: plan } = await supabase
+      .from("plans")
+      .select("*")
+      .eq("id", planId)
+      .eq("status", "published")
+      .maybeSingle();
 
-    // Mini App daxilindən gələn sifarişlər üçün Telegram istifadəçisini tanıyırıq —
-    // beləliklə nəticə həm saytda, həm də Telegram-da (və email-də, əgər varsa) çatır.
+    if (!plan) {
+      res.status(400).json({ error: "Bu plan artıq mövcud deyil." });
+      return;
+    }
+
     if (telegramUserId) {
       await supabase.from("users").upsert({ id: telegramUserId });
     }
@@ -37,12 +83,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from("subscriptions")
       .insert({
         user_id: telegramUserId,
-        week_id: week.id,
-        genre_id: genreId,
-        duration,
+        plan_id: plan.id,
+        genre_id: plan.genre_id,
         status: "pending",
-        amount,
-        currency,
+        amount: plan.price,
+        currency: plan.currency,
         source: telegramUserId ? "miniapp" : "web",
       })
       .select()
@@ -56,8 +101,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const base = process.env.PUBLIC_BASE_URL || "";
     const result = await createPayriffOrder({
       orderId: sub.id,
-      amount,
-      description: `MitoFilm — ${duration === "day" ? "1 günlük" : duration === "month" ? "1 aylıq" : "7 günlük"} tövsiyə`,
+      amount: plan.price,
+      description: `MitoFilm — ${plan.title}`,
       approveUrl: `${base}/result.html?order=${sub.id}`,
       cancelUrl: `${base}/result.html?order=${sub.id}&cancelled=1`,
       declineUrl: `${base}/result.html?order=${sub.id}&declined=1`,
