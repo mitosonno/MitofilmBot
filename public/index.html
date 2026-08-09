@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>MitoFilm — Həftəlik kino seçkisi</title>
-<meta name="description" content="Hər həftə diqqətlə seçilmiş filmlər. Janrına görə bilet götür, ya da hamısını birdən — və 7 günlük tövsiyə siyahını al." />
+<meta name="description" content="Hər həftə diqqətlə seçilmiş filmlər. Janrını seç, tövsiyə planını götür — 1 günlük, 7 günlük və ya 1 aylıq." />
 <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -14,11 +14,11 @@
 </nav>
 
 <header class="hero">
-  <span class="eyebrow">Həftəlik kino bileti</span>
+  <span class="eyebrow">Həftəlik kino tövsiyəsi</span>
   <h1>Bu həftə hansı<br><em>filmə</em> gedirsən?</h1>
-  <p class="sub">MitoFilm hər həftə yeni filmlər seçir, sən sadəcə bileti götür — janrına uyğun, ya da hamısını birdən.</p>
+  <p class="sub">MitoFilm hər həftə yeni filmlər seçir. Sən janrını de, biz sənə uyğun tövsiyə planını təklif edək.</p>
   <div class="cta-row">
-    <a href="#biletler" class="btn btn-gold">Biletlərə bax</a>
+    <a href="#tovsiyeler" class="btn btn-gold">Tövsiyələrə bax</a>
   </div>
 </header>
 
@@ -27,34 +27,44 @@
 <section class="block">
   <div class="block-head">
     <span class="eyebrow">Necə işləyir</span>
-    <h2>Üç addım, bir bilet</h2>
+    <h2>Üç addım, öz tövsiyən</h2>
   </div>
   <div class="steps">
     <div class="step">
       <div class="num">01</div>
-      <h3>Bilet seç</h3>
-      <p>Janr seç, ya da bütün janrları əhatə edən qarışıq bileti götür.</p>
+      <h3>Janr seç</h3>
+      <p>Sevdiyin janrı seç, ya da bütün janrları əhatə edən qarışıq seçimi götür.</p>
     </div>
     <div class="step">
       <div class="num">02</div>
-      <h3>Ödə</h3>
-      <p>Kartınla təhlükəsiz ödəniş et, cəmi bir neçə saniyə çəkir.</p>
+      <h3>Plan seç</h3>
+      <p>1 günlük, 7 günlük və ya 1 aylıq tövsiyə planından birini seç.</p>
     </div>
     <div class="step">
       <div class="num">03</div>
-      <h3>İzlə</h3>
-      <p>7 günlük film siyahın — posterlə, rəylə, izləmə linki ilə qarşında.</p>
+      <h3>Ödə və izlə</h3>
+      <p>Ödənişdən dərhal sonra tövsiyələrin qarşındadır.</p>
     </div>
   </div>
 </section>
 
-<section class="block" id="biletler">
+<section class="block" id="tovsiyeler">
   <div class="block-head">
     <span class="eyebrow">Bu həftə</span>
-    <h2>Biletini seç</h2>
+    <h2>Janrını seç</h2>
   </div>
   <div id="weekLabel" class="week-label"></div>
-  <div id="ticketsRoot"></div>
+  <div id="genresRoot"></div>
+
+  <div id="planSection" class="plan-section" style="display:none">
+    <div class="block-head" style="margin-top:48px">
+      <span class="eyebrow" id="planEyebrow">Plan seç</span>
+      <h2 id="planHeading">—</h2>
+      <a href="#" id="changeGenre" class="change-link">← Janrı dəyiş</a>
+    </div>
+    <div id="plansRoot"></div>
+  </div>
+
   <div class="order-msg" id="orderMsg"></div>
 </section>
 

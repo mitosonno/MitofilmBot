@@ -190,6 +190,8 @@ section.block { padding: 64px 24px; }
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
 .ticket:hover { border-color: var(--line-strong); transform: translateY(-3px); }
+.ticket.genre-card { cursor: pointer; }
+.ticket.genre-card.selected { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
 .ticket.featured {
   border-color: var(--gold-dim);
   background: linear-gradient(165deg, var(--surface-2), var(--surface) 60%);
@@ -250,6 +252,17 @@ section.block { padding: 64px 24px; }
 .btn-select:disabled { opacity: 0.6; cursor: default; transform: none; }
 
 .week-label { text-align: center; color: var(--muted); font-size: 14px; margin-top: -24px; margin-bottom: 40px; }
+
+.change-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13.5px;
+}
+.change-link:hover { color: var(--gold); }
+
+.plans .ticket-main p { margin-top: 4px; }
 
 .empty-state {
   text-align: center;

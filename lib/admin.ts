@@ -28,7 +28,8 @@ export function adminMenuKeyboard() {
     .text(T.adminBtnAddMovie, "admin:add_movie").row()
     .text(T.adminBtnListMovies, "admin:list_movies").row()
     .text(T.adminBtnPublish, "admin:publish").row()
-    .text(T.adminBtnPrices, "admin:prices");
+    .text(T.adminBtnPrices, "admin:prices").row()
+    .text(T.adminBtnSitePrices, "admin:site_prices");
 }
 
 function genreKeyboard(genres: { id: number; name_az: string }[], prefix: string) {
@@ -133,6 +134,14 @@ export async function registerAdminHandlers(bot: Bot) {
     await ctx.reply(T.adminAskGenrePrice);
   });
 
+  bot.callbackQuery("admin:site_prices", async (ctx) => {
+    const id = ctx.from.id;
+    if (!isAdmin(id)) return ctx.answerCallbackQuery();
+    await setAdminSession(id, { flow: "site_prices", step: "genre_day", data: {} });
+    await ctx.answerCallbackQuery();
+    await ctx.reply(T.adminAskSitePriceGenreDay);
+  });
+
   // Mətn mesajları — cari admin sessiyasına görə emal olunur
   bot.on("message:text", async (ctx, next) => {
     const id = ctx.from?.id;
@@ -169,6 +178,31 @@ export async function registerAdminHandlers(bot: Bot) {
         await setSetting("price_mixed", String(val));
         await clearAdminSession(id);
         return ctx.reply(T.adminPricesUpdated);
+      }
+    }
+
+    if (session.flow === "site_prices") {
+      const steps: { step: string; next?: string; nextPrompt?: string; settingKey: string }[] = [
+        { step: "genre_day", next: "genre_week", nextPrompt: T.adminAskSitePriceGenreWeek, settingKey: "price_genre_day" },
+        { step: "genre_week", next: "genre_month", nextPrompt: T.adminAskSitePriceGenreMonth, settingKey: "price_genre_week" },
+        { step: "genre_month", next: "mixed_day", nextPrompt: T.adminAskSitePriceMixedDay, settingKey: "price_genre_month" },
+        { step: "mixed_day", next: "mixed_week", nextPrompt: T.adminAskSitePriceMixedWeek, settingKey: "price_mixed_day" },
+        { step: "mixed_week", next: "mixed_month", nextPrompt: T.adminAskSitePriceMixedMonth, settingKey: "price_mixed_week" },
+        { step: "mixed_month", settingKey: "price_mixed_month" },
+      ];
+      const current = steps.find((s) => s.step === session.step);
+      if (current) {
+        const val = parseFloat(text.replace(",", "."));
+        if (isNaN(val)) return ctx.reply(T.adminInvalidNumber);
+        await setSetting(current.settingKey, val.toFixed(2));
+        if (current.next) {
+          session.step = current.next;
+          await setAdminSession(id, session);
+          return ctx.reply(current.nextPrompt!);
+        } else {
+          await clearAdminSession(id);
+          return ctx.reply(T.adminPricesUpdated);
+        }
       }
     }
 

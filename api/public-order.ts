@@ -11,16 +11,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const body = req.body || {};
     const genreId: number | null = body.genreId ? Number(body.genreId) : null;
+    const duration: "day" | "week" | "month" = ["day", "week", "month"].includes(body.duration)
+      ? body.duration
+      : "week";
 
     const week = await getLatestPublishedWeek();
     if (!week) {
-      res.status(400).json({ error: "Bu həftə üçün hələ bilet açılmayıb." });
+      res.status(400).json({ error: "Bu həftə üçün hələ tövsiyə açılmayıb." });
       return;
     }
 
-    const priceStr = genreId
-      ? (await getSetting("price_genre")) || "3.00"
-      : (await getSetting("price_mixed")) || "5.00";
+    const settingKey = `price_${genreId ? "genre" : "mixed"}_${duration}`;
+    const priceStr = (await getSetting(settingKey)) || "0";
     const amount = parseFloat(priceStr);
     const currency = (await getSetting("currency")) || "AZN";
 
@@ -30,6 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         user_id: null,
         week_id: week.id,
         genre_id: genreId,
+        duration,
         status: "pending",
         amount,
         currency,
@@ -47,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = await createPayriffOrder({
       orderId: sub.id,
       amount,
-      description: `MitoFilm — ${week.week_label}`,
+      description: `MitoFilm — ${duration === "day" ? "1 günlük" : duration === "month" ? "1 aylıq" : "7 günlük"} tövsiyə`,
       approveUrl: `${base}/result.html?order=${sub.id}`,
       cancelUrl: `${base}/result.html?order=${sub.id}&cancelled=1`,
       declineUrl: `${base}/result.html?order=${sub.id}&declined=1`,

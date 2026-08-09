@@ -121,7 +121,16 @@ mitofilm-bot/
 
 Bu, Telegram botundan TAM ASILI DEYİL — istifadəçi birbaşa saytda bilet seçir, Payriff ilə ödəyir, nəticəni saytda görür.
 
-**Vacib:** bu funksiya üçün `db/migration_web.sql` faylını da Supabase SQL Editor-da (schema.sql-dan sonra) işə salmaq lazımdır — bu, `subscriptions` cədvəlinə Telegram-sız sifarişlərə icazə verir.
+**Sayt axını:** istifadəçi əvvəlcə janr (və ya "Qarışıq") seçir, sonra o janr üçün 3 plandan birini seçir:
+- **1 günlük** — ən son yayımlanan həftədən 1 seçilmiş film
+- **7 günlük** — ən son yayımlanan həftənin bütün filmləri
+- **1 aylıq** — son 31 gün ərzində yayımlanmış bütün həftələrin filmləri
+
+Bu planların qiymətlərini Telegram-da `/admin` > "🌐 Sayt qiymətləri" ilə dəyişə bilərsən (bot özü isə ayrıca, sadə həftəlik qiymətlərlə işləyir — "💰 Bot qiymətləri").
+
+**Vacib:** bu funksiya üçün aşağıdakı 2 migration faylını da Supabase SQL Editor-da (schema.sql-dan sonra) sırayla işə salmaq lazımdır:
+1. `db/migration_web.sql` — Telegram-sız (veb) sifarişlərə icazə verir
+2. `db/migration_plans.sql` — müddətli planlar (1 günlük/7 günlük/1 aylıq) üçün lazımi sütun və qiymətlər
 
 Sayt eyni Vercel layihəsində, `/` ünvanında avtomatik görünür (əlavə deploy addımı lazım deyil).
 

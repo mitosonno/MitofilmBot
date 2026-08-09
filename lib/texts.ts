@@ -81,7 +81,8 @@ export const T = {
   adminBtnAddMovie: "➕ Film əlavə et",
   adminBtnListMovies: "📋 Bu həftənin filmləri",
   adminBtnPublish: "📢 Həftəni yayımla",
-  adminBtnPrices: "💰 Qiymətləri dəyiş",
+  adminBtnPrices: "💰 Bot qiymətləri (Telegram)",
+  adminBtnSitePrices: "🌐 Sayt qiymətləri (1g/7g/1ay)",
   adminBtnCancelFlow: "✖️ Ləğv et",
 
   adminNoActiveWeek:
@@ -130,6 +131,13 @@ export const T = {
   adminAskGenrePrice: "Janr üzrə qiyməti yaz (AZN, məs: 3.00):",
   adminAskMixedPrice: "Qarışıq seçim üçün qiyməti yaz (AZN, məs: 5.00):",
   adminPricesUpdated: "Qiymətlər yeniləndi ✅",
+
+  adminAskSitePriceGenreDay: "Sayt — Janr, 1 günlük qiymət (AZN, məs: 1.00):",
+  adminAskSitePriceGenreWeek: "Sayt — Janr, 7 günlük qiymət (AZN, məs: 3.00):",
+  adminAskSitePriceGenreMonth: "Sayt — Janr, 1 aylıq qiymət (AZN, məs: 8.00):",
+  adminAskSitePriceMixedDay: "Sayt — Qarışıq, 1 günlük qiymət (AZN, məs: 1.50):",
+  adminAskSitePriceMixedWeek: "Sayt — Qarışıq, 7 günlük qiymət (AZN, məs: 5.00):",
+  adminAskSitePriceMixedMonth: "Sayt — Qarışıq, 1 aylıq qiymət (AZN, məs: 12.00):",
 
   genericError: "Nəsə səhv getdi, bir az sonra yenidən cəhd et 🙏",
 };

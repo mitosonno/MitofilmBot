@@ -46,6 +46,7 @@ export type Subscription = {
   currency: string;
   payriff_order_id: string | null;
   source: "telegram" | "web";
+  duration: "day" | "week" | "month";
 };
 
 export async function getSetting(key: string): Promise<string | null> {
