@@ -179,10 +179,12 @@ export async function registerAdminHandlers(bot: Bot) {
   bot.on("message:text", async (ctx, next) => {
     const id = ctx.from?.id;
     if (!id || !isAdmin(id)) return next();
-    const session = await getAdminSession(id);
-    if (!session) return next();
 
     const text = ctx.message.text.trim();
+    if (text.startsWith("/")) return next(); // əmrlər heç vaxt sessiya-mətni kimi tutulmasın
+
+    const session = await getAdminSession(id);
+    if (!session) return next();
 
     if (session.flow === "new_week" && session.step === "label") {
       const { data: week } = await supabase

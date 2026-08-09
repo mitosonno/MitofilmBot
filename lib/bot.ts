@@ -59,10 +59,15 @@ export function getBot(): Bot {
   // aktiv onboarding sessiyası yoxdursa `next()` ilə növbəti handler-lərə ötürülür.
   bot.on("message:text", async (ctx, next) => {
     if (!ctx.from) return next();
-    const session = await getUserSession(ctx.from.id);
-    if (!session) return next();
 
     const text = ctx.message.text.trim();
+    // Əmrlər (/admin, /start və s.) HEÇ VAXT sessiya-mətni kimi tutulmamalıdır —
+    // əks halda "janr gözlənilir" vəziyyətində olan istifadəçi üçün /admin belə
+    // janr cavabı kimi qəbul olunur və əsl əmr işə düşmür.
+    if (text.startsWith("/")) return next();
+
+    const session = await getUserSession(ctx.from.id);
+    if (!session) return next();
 
     if (session.step === "name") {
       await supabase.from("users").update({ full_name: text }).eq("id", ctx.from.id);
